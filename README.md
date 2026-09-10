@@ -1,69 +1,53 @@
-# DRAGON — Cloudflare-only build
+# DRAGON — Cloudflare Free + Render Free
 
-This version uses only Cloudflare at runtime:
+Architecture:
 
-- Cloudflare Worker: UI + YouTube Data API search + authorization gate
-- Cloudflare Static Assets: HTML/CSS/JS
-- Cloudflare Container: .NET 10 + FFmpeg + `Tyrrrz/YoutubeDownloader.Core`
+Cloudflare Worker (Free)
+- serves DRAGON UI
+- YouTube search
+- official playback
+- authorization gate
+- reconstructs YouTube URL internally
 
-The browser sends only a YouTube `videoId` to `/api/download`.
-The Worker reconstructs the full YouTube URL internally and passes it to the container.
+Render Web Service (Free)
+- Docker
+- .NET 10
+- FFmpeg
+- Tyrrrz/YoutubeDownloader.Core
+- handles authorized download test requests
 
-## Required Cloudflare variables/secrets
+## Render setup
 
-Set these on the Worker:
+Create a new Web Service from the same GitHub repository.
 
-- `YOUTUBE_API_KEY` — your existing YouTube Data API key
-- `AUTHORIZED_VIDEO_IDS` — comma-separated IDs of videos you own/control and want enabled for the integration test
-- `AUTHORIZED_CHANNEL_IDS` — optional comma-separated channel IDs you own/control
+Settings:
+- Root Directory: `render-backend`
+- Runtime: Docker
+- Plan: Free
 
-At least one authorized ID/channel is required for download buttons to appear.
+Environment variable:
+- `DRAGON_BRIDGE_TOKEN` = choose a long random secret
 
-Example:
+After deploy, copy the Render URL, for example:
+`https://dragon-downloader.onrender.com`
 
-AUTHORIZED_VIDEO_IDS=ABCDEFGHIJK,12345678901
-AUTHORIZED_CHANNEL_IDS=UCxxxxxxxxxxxxxxxxxxxxxx
+## Cloudflare setup
 
-## Deploy without Railway
+Use the repository root for the Cloudflare Worker.
 
-Cloudflare Containers require the Workers Paid plan.
+Deploy command:
+`npx wrangler deploy`
 
-### Cloud-build route (no local Docker required)
+Secrets / variables:
+- `YOUTUBE_API_KEY`
+- `DOWNLOAD_BACKEND_URL` = your Render URL
+- `DOWNLOAD_BRIDGE_TOKEN` = same value as `DRAGON_BRIDGE_TOKEN`
+- `AUTHORIZED_VIDEO_IDS` = comma-separated IDs you own/control for testing
+- `AUTHORIZED_CHANNEL_IDS` = optional channel IDs you own/control
 
-1. Put this entire folder in a GitHub repository.
-2. In Cloudflare Workers & Pages, connect/import that repository.
-3. In the Worker's Build settings, use:
-   - Deploy command: `npx wrangler deploy`
-4. Add `YOUTUBE_API_KEY`, `AUTHORIZED_VIDEO_IDS`, and optionally `AUTHORIZED_CHANNEL_IDS` in Cloudflare settings.
-5. Deploy the production branch.
-6. The first container deployment can take several minutes.
+Important:
+If the existing Cloudflare Worker has a different service name, change `"name"` in `wrangler.jsonc` to match it.
 
-Cloudflare Workers Builds can build the Dockerfile in Cloudflare's build environment, so Railway is not needed.
+## Free-tier behavior
 
-### Local route
-
-If you prefer local deployment:
-1. `npm install`
-2. Start Docker Desktop
-3. `npx wrangler deploy`
-
-## Test
-
-Open:
-
-/api/health
-
-Expected:
-
-{"worker":true,"downloader":true}
-
-Then search in the DRAGON UI.
-
-For an authorized test video/channel:
-- LISTEN plays with the official YouTube embed.
-- DOWNLOAD sends only the video ID from the browser.
-- The Worker constructs `https://www.youtube.com/watch?v=...` internally.
-- The Worker passes that URL to the Cloudflare Container.
-- The Container uses `Tyrrrz/YoutubeDownloader.Core` to produce the requested MP3/MP4.
-
-For other YouTube results, listening still works but downloading stays locked.
+Render Free spins down after 15 minutes of inactivity. The first request after sleep can take roughly a minute to wake the backend. Temporary downloaded files are fine because Render's filesystem is ephemeral and DRAGON streams the result back to the browser.

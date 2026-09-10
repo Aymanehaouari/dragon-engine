@@ -1,18 +1,11 @@
 {
-  "name": "dragon-music-cloudflare",
+  "name": "dragon-music",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },
-  "dependencies": {
-    "@cloudflare/containers": "0.3.7"
-  },
   "devDependencies": {
-    "wrangler": "^4.70.0"
-  },
-  "engines": {
-    "node": ">=22"
+    "wrangler": "^4.131.0"
   }
 }

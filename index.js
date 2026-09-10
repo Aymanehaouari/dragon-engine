@@ -1,10 +1,3 @@
-import { Container } from "@cloudflare/containers";
-
-export class DragonDownloader extends Container {
-  defaultPort = 8080;
-  sleepAfter = "10m";
-}
-
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -121,6 +114,45 @@ async function searchYouTube(env, query) {
   });
 }
 
+async function proxyDownload(request, env, videoId, format) {
+  if (!env.DOWNLOAD_BACKEND_URL) {
+    return json({ error: "DOWNLOAD_BACKEND_URL is missing." }, 500);
+  }
+
+  if (!env.DOWNLOAD_BRIDGE_TOKEN) {
+    return json({ error: "DOWNLOAD_BRIDGE_TOKEN is missing." }, 500);
+  }
+
+  const video = await getYouTubeVideo(env, videoId);
+  if (!video) return json({ error: "Video not found." }, 404);
+
+  const channelId = video?.snippet?.channelId || "";
+  if (!isAuthorized(env, videoId, channelId)) {
+    return json({
+      error: "Download is enabled only for videos/channels you explicitly authorize for this test."
+    }, 403);
+  }
+
+  const internalYouTubeUrl =
+    "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
+
+  const backend = new URL("/api/download", env.DOWNLOAD_BACKEND_URL);
+  backend.searchParams.set("url", internalYouTubeUrl);
+  backend.searchParams.set("format", format);
+
+  const upstream = await fetch(backend.toString(), {
+    method: "GET",
+    headers: {
+      "authorization": "Bearer " + env.DOWNLOAD_BRIDGE_TOKEN
+    }
+  });
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: upstream.headers
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -139,10 +171,6 @@ export default {
       }
 
       if (url.pathname === "/api/download") {
-        if (!env.YOUTUBE_API_KEY) {
-          return json({ error: "YOUTUBE_API_KEY is missing." }, 500);
-        }
-
         const videoId = String(url.searchParams.get("videoId") || "");
         const format = String(url.searchParams.get("format") || "mp3").toLowerCase();
 
@@ -150,72 +178,31 @@ export default {
           return json({ error: "Invalid YouTube video ID." }, 400);
         }
 
-        if (format !== "mp3" && format !== "mp4") {
+        if (!["mp3", "mp4"].includes(format)) {
           return json({ error: "Format must be mp3 or mp4." }, 400);
         }
 
-        // Re-check authorization server-side. We do not trust the browser.
-        const video = await getYouTubeVideo(env, videoId);
-        if (!video) return json({ error: "Video not found." }, 404);
-
-        const channelId = video?.snippet?.channelId || "";
-        if (!isAuthorized(env, videoId, channelId)) {
-          return json({
-            error:
-              "This Cloudflare-only test downloads only videos/channels you explicitly authorize."
-          }, 403);
-        }
-
-        // This is the internal handoff you asked for:
-        // browser sends only videoId -> Worker creates the YouTube URL ->
-        // Worker passes the URL internally to the YoutubeDownloader container.
-        const internalYouTubeUrl =
-          "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
-
-        const internalUrl = new URL("http://dragon-container/api/download");
-        internalUrl.searchParams.set("url", internalYouTubeUrl);
-        internalUrl.searchParams.set("format", format);
-
-        const container = env.DOWNLOADER.getByName("dragon-primary");
-
-        const containerRequest = new Request(internalUrl.toString(), {
-          method: "GET",
-          headers: {
-            "x-dragon-internal": "1"
-          }
-        });
-
-        const response = await container.fetch(containerRequest);
-
-        // Stream the container response straight back to the browser.
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers
-        });
+        return proxyDownload(request, env, videoId, format);
       }
 
       if (url.pathname === "/api/health") {
-        const container = env.DOWNLOADER.getByName("dragon-primary");
-        const response = await container.fetch(
-          new Request("http://dragon-container/health")
-        );
+        if (!env.DOWNLOAD_BACKEND_URL) {
+          return json({ worker: true, downloader: false, error: "DOWNLOAD_BACKEND_URL missing" }, 503);
+        }
 
-        return json({
-          worker: true,
-          downloader: response.ok
-        }, response.ok ? 200 : 503);
+        try {
+          const target = new URL("/health", env.DOWNLOAD_BACKEND_URL);
+          const response = await fetch(target.toString());
+          return json({ worker: true, downloader: response.ok }, response.ok ? 200 : 503);
+        } catch {
+          return json({ worker: true, downloader: false }, 503);
+        }
       }
 
       return env.ASSETS.fetch(request);
     } catch (error) {
       console.error(error);
-      return json(
-        {
-          error: error?.message || "DRAGON internal error."
-        },
-        500
-      );
+      return json({ error: error?.message || "DRAGON internal error." }, 500);
     }
   }
 };
