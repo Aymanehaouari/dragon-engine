@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dragon-music",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-28",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "containers": [
+    {
+      "class_name": "DragonDownloader",
+      "image": "./Dockerfile",
+      "max_instances": 1,
+      "instance_type": "basic"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DOWNLOADER",
+        "class_name": "DragonDownloader"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DragonDownloader"]
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
