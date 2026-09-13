@@ -141,7 +141,7 @@
     if (!selected || !selected.downloadAuthorized) return;
 
     // The browser sends only the videoId. The Worker creates the full YouTube URL
-    // internally and passes it to the YoutubeDownloader container.
+    // internally and passes it to the yt-dlp backend.
     const href =
       "/api/download?videoId=" +
       encodeURIComponent(selected.videoId) +
