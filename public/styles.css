@@ -2655,3 +2655,238 @@ body::before{
     animation:none!important;
   }
 }
+
+
+/* =========================================================
+   OMNIGET SECTION — repo-backed handoff
+   ========================================================= */
+.omniget-section{margin-top:34px}
+.omniget-panel{
+  position:relative;
+  overflow:hidden;
+  display:grid;
+  grid-template-columns:minmax(0,1.5fr) minmax(240px,.75fr);
+  gap:28px;
+  padding:28px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:26px;
+  background:
+    radial-gradient(circle at 88% 8%,rgba(242,133,0,.11),transparent 28%),
+    linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.014));
+  box-shadow:
+    0 32px 90px rgba(0,0,0,.34),
+    inset 0 1px 0 rgba(255,255,255,.04);
+  backdrop-filter:blur(26px) saturate(125%);
+}
+.omniget-panel::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(115deg,transparent 0 32%,rgba(255,255,255,.025) 42%,transparent 53%);
+}
+.omniget-copy{position:relative;z-index:2}
+.omniget-kicker{
+  display:block;
+  color:#f2a35f;
+  font-size:7px;
+  font-weight:950;
+  letter-spacing:.18em;
+}
+.omniget-copy h3{
+  margin:8px 0 10px;
+  max-width:700px;
+  font-size:30px;
+  line-height:1.02;
+  letter-spacing:-.045em;
+}
+.omniget-copy p{
+  max-width:680px;
+  margin:0;
+  color:#8b8d94;
+  font-size:11px;
+  line-height:1.65;
+}
+.omniget-copy code{
+  color:#c8c9cf;
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.055);
+  border-radius:6px;
+  padding:2px 5px;
+}
+.omniget-input-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:9px;
+  margin-top:20px;
+}
+.omniget-input-row input{
+  min-width:0;
+  height:48px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;
+  padding:0 14px;
+  outline:0;
+  color:#fff;
+  background:rgba(255,255,255,.025);
+  font-size:12px;
+}
+.omniget-input-row input:focus{
+  border-color:rgba(242,133,0,.28);
+  box-shadow:0 0 0 3px rgba(242,133,0,.035);
+}
+.omniget-input-row button{
+  height:48px;
+  padding:0 16px;
+  border:0;
+  border-radius:14px;
+  color:#150d05;
+  background:linear-gradient(135deg,#ffd7ad,#f2a35f 58%,#dc7e27);
+  font-size:8px;
+  font-weight:950;
+  letter-spacing:.11em;
+  box-shadow:0 12px 30px rgba(242,133,0,.12);
+}
+.omniget-consent{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  margin-top:12px;
+  color:#6d6f76;
+  font-size:9px;
+}
+.omniget-consent input{margin-top:1px;accent-color:#f2a35f}
+.omniget-actions{display:flex;gap:8px;margin-top:16px}
+.omniget-secondary{
+  height:36px;
+  padding:0 11px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;
+  color:#8f9198;
+  text-decoration:none;
+  background:rgba(255,255,255,.018);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
+.omniget-secondary:hover{color:#fff;border-color:rgba(242,133,0,.20)}
+.omniget-side{
+  position:relative;
+  z-index:2;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:20px;
+  border:1px solid rgba(255,255,255,.055);
+  border-radius:20px;
+  background:rgba(5,6,9,.32);
+}
+.omniget-logo{
+  width:56px;height:56px;
+  display:grid;place-items:center;
+  border-radius:18px;
+  color:#1a0d00;
+  background:linear-gradient(145deg,#ffd8b0,#f28500);
+  font-size:22px;font-weight:1000;
+  box-shadow:0 14px 36px rgba(242,133,0,.14);
+}
+.omniget-meta-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:7px;
+  margin-top:18px;
+}
+.omniget-meta-grid>div{
+  padding:10px 8px;
+  border:1px solid rgba(255,255,255,.05);
+  border-radius:11px;
+  background:rgba(255,255,255,.018);
+}
+.omniget-meta-grid span,
+.omniget-meta-grid strong{display:block}
+.omniget-meta-grid span{color:#55575e;font-size:6px;font-weight:900;letter-spacing:.12em}
+.omniget-meta-grid strong{margin-top:5px;color:#c9cbd1;font-size:10px}
+.omniget-status{margin-top:12px;color:#666970;font-size:8px;line-height:1.5}
+.omniget-status.ok{color:#c9a77a}
+.omniget-status.error{color:#c47e7e}
+
+.mobile-omniget-section{display:none}
+
+@media(max-width:760px){
+  .omniget-section{display:none}
+  .mobile-omniget-section{
+    display:block;
+    margin-top:28px;
+  }
+  .mobile-omniget-card{
+    position:relative;
+    overflow:hidden;
+    padding:18px;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:22px;
+    background:
+      radial-gradient(circle at 92% 4%,rgba(242,133,0,.10),transparent 28%),
+      linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.012));
+    box-shadow:
+      0 24px 65px rgba(0,0,0,.34),
+      inset 0 1px 0 rgba(255,255,255,.035);
+    backdrop-filter:blur(24px) saturate(125%);
+  }
+  .mobile-omniget-head{display:flex;align-items:center;justify-content:space-between}
+  .mobile-omniget-head strong{color:#9b9da4;font-size:9px}
+  .mobile-omniget-card h2{
+    margin:9px 0 7px;
+    font-size:24px;
+    line-height:1.02;
+    letter-spacing:-.045em;
+  }
+  .mobile-omniget-card>p{margin:0;color:#767880;font-size:10px;line-height:1.55}
+  .mobile-omniget-input{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:7px;
+    margin-top:15px;
+  }
+  .mobile-omniget-input input{
+    min-width:0;
+    height:48px;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:14px;
+    padding:0 12px;
+    outline:0;
+    color:#fff;
+    background:rgba(255,255,255,.022);
+    font-size:16px!important;
+  }
+  .mobile-omniget-input button{
+    height:48px;
+    padding:0 13px;
+    border:0;
+    border-radius:14px;
+    color:#190d02;
+    background:linear-gradient(135deg,#ffd7ae,#f2a35f 60%,#dc7e26);
+    font-size:8px;
+    font-weight:950;
+    letter-spacing:.09em;
+  }
+  .omniget-consent.mobile{margin-top:10px}
+  .mobile-omniget-links{display:flex;gap:7px;margin-top:13px}
+  .mobile-omniget-links a{
+    height:34px;
+    padding:0 10px;
+    display:inline-flex;
+    align-items:center;
+    border:1px solid rgba(255,255,255,.07);
+    border-radius:10px;
+    color:#898b92;
+    text-decoration:none;
+    background:rgba(255,255,255,.015);
+    font-size:7px;
+    font-weight:900;
+    letter-spacing:.1em;
+  }
+  .mobile-omniget-card .omniget-status{display:block;margin-top:11px}
+}
