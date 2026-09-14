@@ -11,21 +11,43 @@ function json(data, status = 200) {
   });
 }
 
-function csvSet(value) {
-  return new Set(
-    String(value || "")
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean)
-  );
-}
-
 function isVideoId(value) {
   return /^[A-Za-z0-9_-]{11}$/.test(String(value || ""));
 }
 
-function isChannelId(value) {
-  return /^UC[A-Za-z0-9_-]{22}$/.test(String(value || ""));
+function normalizeFormat(value) {
+  const format = String(value || "").toLowerCase();
+  return format === "mp3" || format === "mp4" ? format : null;
+}
+
+function safeFilename(value, fallback) {
+  const cleaned = String(value || fallback || "dragon-media")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 140);
+
+  return cleaned || fallback || "dragon-media";
+}
+
+function parseVideoId(input) {
+  const value = String(input || "").trim();
+  if (isVideoId(value)) return value;
+
+  try {
+    const url = new URL(value);
+    if (url.hostname === "youtu.be") {
+      const id = url.pathname.split("/").filter(Boolean)[0] || "";
+      return isVideoId(id) ? id : null;
+    }
+
+    if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname)) {
+      const id = url.searchParams.get("v") || "";
+      return isVideoId(id) ? id : null;
+    }
+  } catch {}
+
+  return null;
 }
 
 function decodeEntities(value) {
@@ -38,59 +60,9 @@ function decodeEntities(value) {
     .replaceAll("&gt;", ">");
 }
 
-function registryStub(env) {
-  if (!env.CHANNEL_REGISTRY) return null;
-  const id = env.CHANNEL_REGISTRY.idFromName("authorized-channels");
-  return env.CHANNEL_REGISTRY.get(id);
-}
-
-async function registryRequest(env, path, init = {}) {
-  const stub = registryStub(env);
-  if (!stub) {
-    return json({ error: "CHANNEL_REGISTRY binding is missing." }, 503);
-  }
-
-  return stub.fetch(
-    new Request("https://channel-registry.internal" + path, init)
-  );
-}
-
-async function listManagedChannels(env) {
-  const response = await registryRequest(env, "/channels");
-  if (!response.ok) return [];
-  const data = await response.json();
-  return Array.isArray(data.channels) ? data.channels : [];
-}
-
-async function authorizedChannelSet(env) {
-  const result = csvSet(env.AUTHORIZED_CHANNEL_IDS);
-
-  try {
-    const managed = await listManagedChannels(env);
-    for (const channel of managed) {
-      if (channel?.id) result.add(channel.id);
-    }
-  } catch (error) {
-    console.error("Channel registry read failed:", error);
-  }
-
-  return result;
-}
-
-async function isAuthorized(env, videoId, channelId) {
-  const ids = csvSet(env.AUTHORIZED_VIDEO_IDS);
-  if (ids.has(videoId)) return true;
-  if (!channelId) return false;
-
-  const channels = await authorizedChannelSet(env);
-  return channels.has(channelId);
-}
-
 function adminAuthError(request, env) {
   const token = String(env.ADMIN_TOKEN || "");
-  if (!token) {
-    return json({ error: "ADMIN_TOKEN is not configured." }, 503);
-  }
+  if (!token) return json({ error: "ADMIN_TOKEN is not configured." }, 503);
 
   const auth = request.headers.get("authorization") || "";
   if (auth !== "Bearer " + token) {
@@ -100,114 +72,69 @@ function adminAuthError(request, env) {
   return null;
 }
 
-async function getYouTubeVideo(env, videoId) {
-  const u = new URL("https://www.googleapis.com/youtube/v3/videos");
-  u.searchParams.set("part", "snippet,status");
-  u.searchParams.set("id", videoId);
-  u.searchParams.set("key", env.YOUTUBE_API_KEY);
-
-  const response = await fetch(u);
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data?.error?.message || "YouTube video lookup failed.");
-  }
-
-  return Array.isArray(data.items) ? data.items[0] || null : null;
+function registryStub(env) {
+  if (!env.MEDIA_REGISTRY) return null;
+  const id = env.MEDIA_REGISTRY.idFromName("dragon-media-library");
+  return env.MEDIA_REGISTRY.get(id);
 }
 
-function parseChannelReference(input) {
-  const value = String(input || "").trim();
-  if (!value) return null;
+async function registryRequest(env, path, init = {}) {
+  const stub = registryStub(env);
+  if (!stub) return json({ error: "MEDIA_REGISTRY binding is missing." }, 503);
 
-  if (isChannelId(value)) {
-    return { type: "id", value };
-  }
-
-  if (value.startsWith("@") && value.length > 1) {
-    return { type: "handle", value };
-  }
-
-  let url;
-  try {
-    url = new URL(value.startsWith("http") ? value : "https://" + value);
-  } catch {
-    return null;
-  }
-
-  if (!["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname)) {
-    return null;
-  }
-
-  const parts = url.pathname.split("/").filter(Boolean);
-  if (parts.length < 2) return null;
-
-  if (parts[0] === "channel" && isChannelId(parts[1])) {
-    return { type: "id", value: parts[1] };
-  }
-
-  if (parts[0].startsWith("@")) {
-    return { type: "handle", value: parts[0] };
-  }
-
-  if (parts[0] === "user" && parts[1]) {
-    return { type: "username", value: parts[1] };
-  }
-
-  return null;
+  return stub.fetch(
+    new Request("https://media-registry.internal" + path, init)
+  );
 }
 
-async function resolveChannel(env, input) {
-  if (!env.YOUTUBE_API_KEY) {
-    throw new Error("YOUTUBE_API_KEY is missing.");
-  }
+async function getMediaEntry(env, videoId) {
+  const response = await registryRequest(
+    env,
+    "/media/" + encodeURIComponent(videoId)
+  );
 
-  const ref = parseChannelReference(input);
-  if (!ref) {
-    throw new Error(
-      "Use a channel ID, @handle, youtube.com/@handle, youtube.com/channel/ID, or youtube.com/user/name."
-    );
-  }
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error("Media registry lookup failed.");
+  return response.json();
+}
 
-  const u = new URL("https://www.googleapis.com/youtube/v3/channels");
-  u.searchParams.set("part", "snippet");
-  u.searchParams.set("key", env.YOUTUBE_API_KEY);
-
-  if (ref.type === "id") u.searchParams.set("id", ref.value);
-  if (ref.type === "handle") u.searchParams.set("forHandle", ref.value);
-  if (ref.type === "username") u.searchParams.set("forUsername", ref.value);
-
-  const response = await fetch(u);
+async function listMediaEntries(env) {
+  const response = await registryRequest(env, "/media");
+  if (!response.ok) throw new Error("Media registry lookup failed.");
   const data = await response.json();
+  return Array.isArray(data.items) ? data.items : [];
+}
 
-  if (!response.ok) {
-    throw new Error(data?.error?.message || "YouTube channel lookup failed.");
+async function saveMediaFormat(env, videoId, format, record) {
+  const response = await registryRequest(
+    env,
+    "/media/" + encodeURIComponent(videoId) + "/" + format,
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(record)
+    }
+  );
+
+  if (!response.ok) throw new Error("Could not save media mapping.");
+  return response.json();
+}
+
+async function deleteMediaFormat(env, videoId, format) {
+  const response = await registryRequest(
+    env,
+    "/media/" + encodeURIComponent(videoId) + "/" + format,
+    { method: "DELETE" }
+  );
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error("Could not remove media mapping.");
   }
 
-  const item = Array.isArray(data.items) ? data.items[0] : null;
-  if (!item?.id) {
-    throw new Error("YouTube channel not found.");
-  }
-
-  const snippet = item.snippet || {};
-  const thumbs = snippet.thumbnails || {};
-
-  return {
-    id: item.id,
-    title: decodeEntities(snippet.title || item.id),
-    handle: snippet.customUrl || "",
-    thumbnail:
-      thumbs.medium?.url ||
-      thumbs.default?.url ||
-      thumbs.high?.url ||
-      "",
-    addedAt: new Date().toISOString()
-  };
+  return response.status === 404 ? null : response.json();
 }
 
 async function searchYouTube(env, query) {
-  const managedChannelsPromise = authorizedChannelSet(env);
-
   const u = new URL("https://www.googleapis.com/youtube/v3/search");
   u.searchParams.set("part", "snippet");
   u.searchParams.set("type", "video");
@@ -227,6 +154,18 @@ async function searchYouTube(env, query) {
   const raw = Array.isArray(data.items) ? data.items : [];
   const ids = raw.map((x) => x?.id?.videoId).filter(Boolean);
   const statusMap = new Map();
+  const mediaMap = new Map();
+
+  await Promise.all(
+    ids.map(async (videoId) => {
+      try {
+        const entry = await getMediaEntry(env, videoId);
+        if (entry) mediaMap.set(videoId, entry);
+      } catch (error) {
+        console.error("Media lookup failed for", videoId, error);
+      }
+    })
+  );
 
   if (ids.length) {
     const details = new URL("https://www.googleapis.com/youtube/v3/videos");
@@ -243,90 +182,174 @@ async function searchYouTube(env, query) {
     }
   }
 
-  const channelSet = await managedChannelsPromise;
-  const videoSet = csvSet(env.AUTHORIZED_VIDEO_IDS);
-
   return raw.map((item) => {
     const videoId = item?.id?.videoId || "";
     const snippet = item?.snippet || {};
     const thumbs = snippet.thumbnails || {};
-    const channelId = snippet.channelId || "";
     const status = statusMap.get(videoId) || {};
+    const media = mediaMap.get(videoId) || null;
+    const formats = [];
+
+    if (media?.formats?.mp3) formats.push("mp3");
+    if (media?.formats?.mp4) formats.push("mp4");
 
     return {
       videoId,
       title: decodeEntities(snippet.title || "Untitled"),
       channel: decodeEntities(snippet.channelTitle || "YouTube"),
-      channelId,
+      channelId: snippet.channelId || "",
       thumbnail:
         thumbs.high?.url ||
         thumbs.medium?.url ||
         thumbs.default?.url ||
         "",
       embeddable: status.embeddable !== false,
-      downloadAuthorized:
-        videoSet.has(videoId) || (channelId && channelSet.has(channelId))
+      downloadFormats: formats
     };
   });
 }
 
-async function proxyDownload(env, videoId, format) {
-  if (!env.DOWNLOAD_BACKEND_URL) {
-    return json({ error: "DOWNLOAD_BACKEND_URL is missing." }, 500);
+async function serveDownload(env, videoId, format) {
+  if (!env.MEDIA) {
+    return json({ error: "R2 binding MEDIA is missing." }, 503);
   }
 
-  if (!env.DOWNLOAD_BRIDGE_TOKEN) {
-    return json({ error: "DOWNLOAD_BRIDGE_TOKEN is missing." }, 500);
+  const entry = await getMediaEntry(env, videoId);
+  const record = entry?.formats?.[format];
+
+  if (!record?.key) {
+    return json(
+      {
+        error:
+          "This format is not in your DRAGON media library. Upload or map your own file in Admin."
+      },
+      404
+    );
   }
 
-  const video = await getYouTubeVideo(env, videoId);
-  if (!video) return json({ error: "Video not found." }, 404);
-
-  const channelId = video?.snippet?.channelId || "";
-  if (!(await isAuthorized(env, videoId, channelId))) {
-    return json({
-      error: "Download is enabled only for videos/channels you explicitly authorize."
-    }, 403);
+  const object = await env.MEDIA.get(record.key);
+  if (!object) {
+    return json(
+      { error: "The mapped file no longer exists in R2 storage." },
+      404
+    );
   }
 
-  const internalYouTubeUrl =
-    "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
 
-  const backend = new URL("/api/download", env.DOWNLOAD_BACKEND_URL);
-  backend.searchParams.set("url", internalYouTubeUrl);
-  backend.searchParams.set("format", format);
+  const fallbackName = videoId + "." + format;
+  const filename = safeFilename(
+    record.filename || object.customMetadata?.filename,
+    fallbackName
+  );
 
-  const upstream = await fetch(backend.toString(), {
-    method: "GET",
-    headers: {
-      "authorization": "Bearer " + env.DOWNLOAD_BRIDGE_TOKEN
-    }
-  });
+  headers.set(
+    "content-type",
+    headers.get("content-type") ||
+      (format === "mp3" ? "audio/mpeg" : "video/mp4")
+  );
+  headers.set(
+    "content-disposition",
+    'attachment; filename="' + filename.replaceAll('"', "") + '"'
+  );
+  headers.set("cache-control", "private, no-store");
+  headers.set("etag", object.httpEtag);
 
-  const headers = new Headers(upstream.headers);
-  headers.set("cache-control", "no-store");
-  headers.set("x-content-type-options", "nosniff");
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers
-  });
+  return new Response(object.body, { headers });
 }
 
 async function handleAdmin(request, env, url) {
   const authError = adminAuthError(request, env);
   if (authError) return authError;
 
-  if (url.pathname === "/api/admin/channels" && request.method === "GET") {
-    const channels = await listManagedChannels(env);
-    return json({
-      channels,
-      legacyChannelIds: [...csvSet(env.AUTHORIZED_CHANNEL_IDS)]
-    });
+  if (!env.MEDIA) {
+    return json({ error: "R2 binding MEDIA is missing." }, 503);
   }
 
-  if (url.pathname === "/api/admin/channels" && request.method === "POST") {
+  if (url.pathname === "/api/admin/media" && request.method === "GET") {
+    const items = await listMediaEntries(env);
+    return json({ items });
+  }
+
+  if (url.pathname === "/api/admin/media/upload" && request.method === "POST") {
+    const videoId = parseVideoId(url.searchParams.get("videoId"));
+    const format = normalizeFormat(url.searchParams.get("format"));
+    const filenameHeader = request.headers.get("x-file-name") || "";
+    const contentLength = Number(request.headers.get("content-length") || 0);
+
+    if (!videoId) return json({ error: "Invalid YouTube video ID or URL." }, 400);
+    if (!format) return json({ error: "Format must be mp3 or mp4." }, 400);
+    if (!request.body) return json({ error: "Missing file body." }, 400);
+
+    const extension = format === "mp3" ? ".mp3" : ".mp4";
+    const filename = safeFilename(
+      decodeURIComponent(filenameHeader || ""),
+      videoId + extension
+    );
+
+    if (!filename.toLowerCase().endsWith(extension)) {
+      return json({ error: "Selected file extension does not match format." }, 400);
+    }
+
+    const key =
+      "media/" +
+      videoId +
+      "/" +
+      format +
+      "/" +
+      Date.now() +
+      "-" +
+      filename.replace(/[^A-Za-z0-9._-]+/g, "_");
+
+    const contentType =
+      request.headers.get("content-type") ||
+      (format === "mp3" ? "audio/mpeg" : "video/mp4");
+
+    const object = await env.MEDIA.put(key, request.body, {
+      httpMetadata: {
+        contentType
+      },
+      customMetadata: {
+        videoId,
+        format,
+        filename
+      }
+    });
+
+    const oldEntry = await getMediaEntry(env, videoId);
+    const oldRecord = oldEntry?.formats?.[format];
+
+    const record = {
+      key,
+      filename,
+      size: contentLength || null,
+      contentType,
+      uploadedAt: new Date().toISOString(),
+      source: "upload"
+    };
+
+    const saved = await saveMediaFormat(env, videoId, format, record);
+
+    if (oldRecord?.key && oldRecord.key !== key) {
+      try {
+        await env.MEDIA.delete(oldRecord.key);
+      } catch (error) {
+        console.error("Old object cleanup failed:", error);
+      }
+    }
+
+    return json(
+      {
+        ok: true,
+        etag: object?.etag || null,
+        item: saved
+      },
+      201
+    );
+  }
+
+  if (url.pathname === "/api/admin/media/map" && request.method === "POST") {
     let body;
     try {
       body = await request.json();
@@ -334,106 +357,141 @@ async function handleAdmin(request, env, url) {
       return json({ error: "Invalid JSON body." }, 400);
     }
 
-    const input = String(body?.channel || "").trim();
-    if (!input) {
-      return json({ error: "Channel is required." }, 400);
+    const videoId = parseVideoId(body?.videoId || body?.youtube);
+    const format = normalizeFormat(body?.format);
+    const key = String(body?.key || "").trim();
+
+    if (!videoId) return json({ error: "Invalid YouTube video ID or URL." }, 400);
+    if (!format) return json({ error: "Format must be mp3 or mp4." }, 400);
+    if (!key) return json({ error: "R2 object key is required." }, 400);
+
+    const object = await env.MEDIA.head(key);
+    if (!object) {
+      return json({ error: "That R2 object key does not exist." }, 404);
     }
 
-    let channel;
-    try {
-      channel = await resolveChannel(env, input);
-    } catch (error) {
-      return json({ error: error?.message || "Channel lookup failed." }, 400);
-    }
+    const extension = format === "mp3" ? ".mp3" : ".mp4";
+    const filename = safeFilename(
+      body?.filename || object.customMetadata?.filename,
+      videoId + extension
+    );
 
-    const response = await registryRequest(env, "/channels", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(channel)
-    });
+    const record = {
+      key,
+      filename,
+      size: object.size || null,
+      contentType:
+        object.httpMetadata?.contentType ||
+        (format === "mp3" ? "audio/mpeg" : "video/mp4"),
+      uploadedAt: new Date().toISOString(),
+      source: "mapped"
+    };
 
-    if (!response.ok) {
-      return json({ error: "Could not save channel." }, 500);
-    }
-
-    const saved = await response.json();
-    return json(saved, 201);
+    const saved = await saveMediaFormat(env, videoId, format, record);
+    return json({ ok: true, item: saved }, 201);
   }
 
   if (
-    url.pathname.startsWith("/api/admin/channels/") &&
+    url.pathname.startsWith("/api/admin/media/") &&
     request.method === "DELETE"
   ) {
-    const channelId = decodeURIComponent(
-      url.pathname.slice("/api/admin/channels/".length)
-    );
+    const parts = url.pathname.split("/").filter(Boolean);
+    const videoId = parts[3] || "";
+    const format = normalizeFormat(parts[4]);
 
-    if (!isChannelId(channelId)) {
-      return json({ error: "Invalid channel ID." }, 400);
+    if (!isVideoId(videoId) || !format) {
+      return json({ error: "Invalid media mapping." }, 400);
     }
 
-    const response = await registryRequest(
-      env,
-      "/channels/" + encodeURIComponent(channelId),
-      { method: "DELETE" }
-    );
+    const entry = await getMediaEntry(env, videoId);
+    const record = entry?.formats?.[format];
+    const deleteObject = url.searchParams.get("deleteObject") !== "false";
 
-    return new Response(response.body, {
-      status: response.status,
-      headers: response.headers
-    });
+    await deleteMediaFormat(env, videoId, format);
+
+    if (deleteObject && record?.key) {
+      try {
+        await env.MEDIA.delete(record.key);
+      } catch (error) {
+        console.error("R2 delete failed:", error);
+      }
+    }
+
+    return json({ ok: true, videoId, format });
   }
 
   return json({ error: "Admin route not found." }, 404);
 }
 
-export class ChannelRegistry extends DurableObject {
+export class MediaRegistry extends DurableObject {
   async fetch(request) {
     const url = new URL(request.url);
-    const key = "channels";
+    const key = "media";
 
-    if (url.pathname === "/channels" && request.method === "GET") {
-      const channels = (await this.ctx.storage.get(key)) || {};
+    const all = (await this.ctx.storage.get(key)) || {};
+
+    if (url.pathname === "/media" && request.method === "GET") {
       return json({
-        channels: Object.values(channels).sort((a, b) =>
-          String(a.title || a.id).localeCompare(String(b.title || b.id))
+        items: Object.values(all).sort((a, b) =>
+          String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""))
         )
       });
     }
 
-    if (url.pathname === "/channels" && request.method === "PUT") {
-      const channel = await request.json();
+    if (url.pathname.startsWith("/media/")) {
+      const parts = url.pathname.split("/").filter(Boolean);
+      const videoId = parts[1] || "";
+      const format = parts[2] || "";
 
-      if (!channel?.id || !isChannelId(channel.id)) {
-        return json({ error: "Invalid channel." }, 400);
+      if (!isVideoId(videoId)) {
+        return json({ error: "Invalid video ID." }, 400);
       }
 
-      const channels = (await this.ctx.storage.get(key)) || {};
-      channels[channel.id] = channel;
-      await this.ctx.storage.put(key, channels);
+      if (parts.length === 2 && request.method === "GET") {
+        const item = all[videoId];
+        return item ? json(item) : json({ error: "Not found." }, 404);
+      }
 
-      return json({
-        channel,
-        channels: Object.values(channels).sort((a, b) =>
-          String(a.title || a.id).localeCompare(String(b.title || b.id))
-        )
-      });
-    }
+      if (parts.length === 3 && request.method === "PUT") {
+        const normalized = normalizeFormat(format);
+        if (!normalized) return json({ error: "Invalid format." }, 400);
 
-    if (
-      url.pathname.startsWith("/channels/") &&
-      request.method === "DELETE"
-    ) {
-      const channelId = decodeURIComponent(
-        url.pathname.slice("/channels/".length)
-      );
+        const record = await request.json();
+        const item = all[videoId] || {
+          videoId,
+          formats: {},
+          createdAt: new Date().toISOString()
+        };
 
-      const channels = (await this.ctx.storage.get(key)) || {};
-      const existed = Boolean(channels[channelId]);
-      delete channels[channelId];
-      await this.ctx.storage.put(key, channels);
+        item.formats[normalized] = record;
+        item.updatedAt = new Date().toISOString();
+        all[videoId] = item;
+        await this.ctx.storage.put(key, all);
 
-      return json({ deleted: existed, channelId });
+        return json(item);
+      }
+
+      if (parts.length === 3 && request.method === "DELETE") {
+        const normalized = normalizeFormat(format);
+        if (!normalized) return json({ error: "Invalid format." }, 400);
+
+        const item = all[videoId];
+        if (!item?.formats?.[normalized]) {
+          return json({ error: "Not found." }, 404);
+        }
+
+        delete item.formats[normalized];
+        item.updatedAt = new Date().toISOString();
+
+        if (!item.formats.mp3 && !item.formats.mp4) {
+          delete all[videoId];
+        } else {
+          all[videoId] = item;
+        }
+
+        await this.ctx.storage.put(key, all);
+        return json({ ok: true, videoId, format: normalized });
+      }
     }
 
     return json({ error: "Registry route not found." }, 404);
@@ -463,55 +521,27 @@ export default {
 
       if (url.pathname === "/api/download") {
         const videoId = String(url.searchParams.get("videoId") || "");
-        const format = String(
-          url.searchParams.get("format") || "mp3"
-        ).toLowerCase();
+        const format = normalizeFormat(url.searchParams.get("format"));
 
         if (!isVideoId(videoId)) {
           return json({ error: "Invalid YouTube video ID." }, 400);
         }
 
-        if (!["mp3", "mp4"].includes(format)) {
+        if (!format) {
           return json({ error: "Format must be mp3 or mp4." }, 400);
         }
 
-        return proxyDownload(env, videoId, format);
+        return serveDownload(env, videoId, format);
       }
 
       if (url.pathname === "/api/health") {
-        if (!env.DOWNLOAD_BACKEND_URL) {
-          return json(
-            {
-              worker: true,
-              downloader: false,
-              registry: Boolean(env.CHANNEL_REGISTRY),
-              error: "DOWNLOAD_BACKEND_URL missing"
-            },
-            503
-          );
-        }
-
-        try {
-          const target = new URL("/health", env.DOWNLOAD_BACKEND_URL);
-          const response = await fetch(target.toString());
-          return json(
-            {
-              worker: true,
-              downloader: response.ok,
-              registry: Boolean(env.CHANNEL_REGISTRY)
-            },
-            response.ok ? 200 : 503
-          );
-        } catch {
-          return json(
-            {
-              worker: true,
-              downloader: false,
-              registry: Boolean(env.CHANNEL_REGISTRY)
-            },
-            503
-          );
-        }
+        return json({
+          worker: true,
+          storage: Boolean(env.MEDIA),
+          registry: Boolean(env.MEDIA_REGISTRY),
+          youtubeSearch: Boolean(env.YOUTUBE_API_KEY),
+          downloadPath: "Cloudflare R2"
+        });
       }
 
       return env.ASSETS.fetch(request);
