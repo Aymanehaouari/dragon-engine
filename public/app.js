@@ -3,223 +3,338 @@
 
   const $ = (id) => document.getElementById(id);
   const query = $("query");
-  const searchBtn = $("searchBtn");
   const results = $("results");
   const count = $("count");
-  const status = $("status");
-  const cover = $("cover");
-  const coverPlaceholder = $("coverPlaceholder");
-  const nowTitle = $("nowTitle");
-  const nowChannel = $("nowChannel");
-  const iframeWrap = $("iframeWrap");
-  const openBtn = $("openBtn");
-  const downloadBtn = $("downloadBtn");
-  const message = $("message");
+  const resultsTitle = $("resultsTitle");
+  const loadMore = $("loadMore");
+  const playerPanel = $("playerPanel");
+  const playerThumb = $("playerThumb");
+  const playerTitle = $("playerTitle");
+  const playerChannel = $("playerChannel");
+  const playPauseBtn = $("playPauseBtn");
+  const prevBtn = $("prevBtn");
+  const nextBtn = $("nextBtn");
+  const progress = $("progress");
+  const currentTime = $("currentTime");
+  const duration = $("duration");
+  const openYouTube = $("openYouTube");
+  const queueToggle = $("queueToggle");
+  const queuePanel = $("queuePanel");
+  const queueClose = $("queueClose");
+  const queueList = $("queueList");
+  const recentSearches = $("recentSearches");
+  const toast = $("toast");
 
   let tracks = [];
-  let selected = null;
-  let format = "mp3";
+  let queue = [];
+  let selectedIndex = -1;
+  let nextPageToken = null;
+  let activeQuery = "";
+  let player = null;
+  let playerReady = false;
+  let progressTimer = null;
 
   function esc(value) {
     return String(value ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
 
-  function hasFormat(track, wanted) {
-    return Array.isArray(track.downloadFormats) &&
-      track.downloadFormats.includes(wanted);
+  function fmtTime(seconds) {
+    const s = Math.max(0, Math.floor(Number(seconds || 0)));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return h ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${m}:${String(sec).padStart(2,"0")}`;
   }
 
-  async function search() {
-    const q = query.value.trim();
+  function fmtViews(value) {
+    const n = Number(value || 0);
+    if (n >= 1e9) return (n/1e9).toFixed(1).replace(".0","") + "B";
+    if (n >= 1e6) return (n/1e6).toFixed(1).replace(".0","") + "M";
+    if (n >= 1e3) return (n/1e3).toFixed(1).replace(".0","") + "K";
+    return n ? String(n) : "";
+  }
+
+  function showToast(text) {
+    toast.textContent = text;
+    toast.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove("show"), 1800);
+  }
+
+  function saveRecent(q) {
+    const current = JSON.parse(localStorage.getItem("dragon_recent") || "[]");
+    const next = [q, ...current.filter(x => x.toLowerCase() !== q.toLowerCase())].slice(0, 6);
+    localStorage.setItem("dragon_recent", JSON.stringify(next));
+    renderRecent();
+  }
+
+  function renderRecent() {
+    const items = JSON.parse(localStorage.getItem("dragon_recent") || "[]");
+    recentSearches.innerHTML = items.length
+      ? items.map(q => `<button data-recent="${esc(q)}">${esc(q)}</button>`).join("")
+      : '<div class="recent-empty">No searches yet</div>';
+  }
+
+  async function search(q, append = false) {
+    q = String(q || "").trim();
     if (!q) return;
 
-    searchBtn.disabled = true;
-    searchBtn.textContent = "SEARCHING";
-    status.textContent = "SEARCHING";
+    if (!append) {
+      activeQuery = q;
+      saveRecent(q);
+      results.innerHTML = '<div class="loading-state"><div class="loader"></div><span>Searching DRAGON...</span></div>';
+      count.textContent = "0";
+      resultsTitle.textContent = q;
+      nextPageToken = null;
+    }
+
+    const url = new URL("/api/search", location.origin);
+    url.searchParams.set("q", q);
+    if (append && nextPageToken) url.searchParams.set("pageToken", nextPageToken);
 
     try {
-      const response = await fetch("/api/search?q=" + encodeURIComponent(q));
+      const response = await fetch(url);
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Search failed");
 
-      if (!response.ok) throw new Error(data.error || "Search failed.");
-
-      tracks = Array.isArray(data.tracks) ? data.tracks : [];
-      render();
-      status.textContent = "ONLINE";
+      const incoming = Array.isArray(data.tracks) ? data.tracks : [];
+      tracks = append ? [...tracks, ...incoming] : incoming;
+      queue = tracks.slice();
+      nextPageToken = data.nextPageToken || null;
+      renderTracks();
+      renderQueue();
+      loadMore.hidden = !nextPageToken;
+      query.value = q;
     } catch (error) {
-      results.innerHTML =
-        '<div class="empty">' + esc(error.message || "SEARCH FAILED") + "</div>";
-      count.textContent = "0";
-      status.textContent = "ERROR";
-    } finally {
-      searchBtn.disabled = false;
-      searchBtn.textContent = "SEARCH";
+      if (!append) {
+        results.innerHTML = `<div class="empty-state"><h3>Search failed</h3><p>${esc(error.message)}</p></div>`;
+      }
+      showToast(error.message || "Search failed");
     }
   }
 
-  function render() {
+  function renderTracks() {
     count.textContent = String(tracks.length);
 
     if (!tracks.length) {
-      results.innerHTML = '<div class="empty">NO RESULTS</div>';
+      results.innerHTML = '<div class="empty-state"><h3>No results</h3><p>Try a different search.</p></div>';
       return;
     }
 
     results.innerHTML = tracks.map((track, index) => {
-      const formats = Array.isArray(track.downloadFormats)
-        ? track.downloadFormats.map((x) => x.toUpperCase()).join(" / ")
-        : "";
+      const views = fmtViews(track.views);
+      const meta = [track.channel, views ? views + " views" : "", track.durationSeconds ? fmtTime(track.durationSeconds) : ""]
+        .filter(Boolean).join(" · ");
 
-      const downloadAction = formats
-        ? '<button class="download" data-download="' + index + '">DOWNLOAD</button>'
-        : "";
-
-      const flag = formats
-        ? '<span class="flag authorized">R2: ' + esc(formats) + '</span>'
-        : '<span class="flag">LISTEN</span>';
-
-      return (
-        '<article class="track">' +
-          '<img src="' + esc(track.thumbnail) + '" alt="">' +
-          '<div>' +
-            '<div class="track-title">' + esc(track.title) + '</div>' +
-            '<div class="track-channel">' + esc(track.channel) + '</div>' +
-            '<div class="track-flags">' +
-              '<span class="flag">YOUTUBE</span>' +
-              flag +
-            '</div>' +
-          '</div>' +
-          '<div class="track-actions">' +
-            '<button data-play="' + index + '">LISTEN</button>' +
-            downloadAction +
-          '</div>' +
-        '</article>'
-      );
+      return `
+        <article class="track-card ${selectedIndex === index ? "active" : ""}" data-index="${index}">
+          <button class="cover-button" data-play="${index}" type="button">
+            <img src="${esc(track.thumbnail)}" alt="">
+            <span class="cover-overlay"><span class="cover-play">▶</span></span>
+          </button>
+          <div class="track-info">
+            <div class="track-title">${esc(track.title)}</div>
+            <div class="track-meta">${esc(meta)}</div>
+          </div>
+          <div class="track-actions">
+            <button data-queue="${index}" type="button" title="Add to queue">＋</button>
+            <button data-youtube="${index}" type="button" title="Open on YouTube">↗</button>
+          </div>
+        </article>
+      `;
     }).join("");
   }
 
-  function selectTrack(track) {
-    selected = track;
-    nowTitle.textContent = track.title;
-    nowChannel.textContent = track.channel;
+  function renderQueue() {
+    queueList.innerHTML = queue.length
+      ? queue.map((track, index) => `
+          <button class="queue-item ${tracks[selectedIndex]?.videoId === track.videoId ? "active" : ""}" data-queue-play="${index}" type="button">
+            <img src="${esc(track.thumbnail)}" alt="">
+            <span>
+              <strong>${esc(track.title)}</strong>
+              <small>${esc(track.channel)}</small>
+            </span>
+          </button>
+        `).join("")
+      : '<div class="recent-empty">Queue is empty</div>';
+  }
 
-    cover.src = track.thumbnail || "";
-    cover.style.display = track.thumbnail ? "block" : "none";
-    coverPlaceholder.style.display = track.thumbnail ? "none" : "grid";
+  function ensurePlayer(videoId) {
+    if (playerReady && player) {
+      player.loadVideoById(videoId);
+      return;
+    }
 
-    const youtubeUrl =
-      "https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId);
+    const mount = document.createElement("div");
+    mount.id = "yt-player";
+    $("youtubeMount").replaceChildren(mount);
 
-    openBtn.disabled = false;
-    openBtn.onclick = () =>
-      window.open(youtubeUrl, "_blank", "noopener,noreferrer");
+    player = new YT.Player("yt-player", {
+      height: "1",
+      width: "1",
+      videoId,
+      playerVars: {
+        autoplay: 1,
+        controls: 0,
+        playsinline: 1,
+        rel: 0,
+        origin: location.origin
+      },
+      events: {
+        onReady: (event) => {
+          playerReady = true;
+          event.target.playVideo();
+          startProgressLoop();
+        },
+        onStateChange: handlePlayerState
+      }
+    });
+  }
+
+  function handlePlayerState(event) {
+    if (!window.YT) return;
+    if (event.data === YT.PlayerState.PLAYING) {
+      playPauseBtn.textContent = "❚❚";
+      startProgressLoop();
+    } else if (event.data === YT.PlayerState.PAUSED) {
+      playPauseBtn.textContent = "▶";
+    } else if (event.data === YT.PlayerState.ENDED) {
+      playNext();
+    }
+  }
+
+  function startProgressLoop() {
+    clearInterval(progressTimer);
+    progressTimer = setInterval(() => {
+      if (!playerReady || !player?.getDuration) return;
+      const now = Number(player.getCurrentTime?.() || 0);
+      const total = Number(player.getDuration?.() || 0);
+      currentTime.textContent = fmtTime(now);
+      duration.textContent = fmtTime(total);
+      progress.value = total ? String(Math.round((now / total) * 1000)) : "0";
+    }, 500);
+  }
+
+  function playTrack(index) {
+    const track = tracks[index];
+    if (!track) return;
 
     if (track.embeddable === false) {
-      iframeWrap.innerHTML =
-        '<div class="player-empty">EMBED DISABLED — OPEN IN YOUTUBE</div>';
-      message.textContent = "THIS VIDEO CANNOT BE EMBEDDED";
-    } else {
-      const src =
-        "https://www.youtube.com/embed/" +
-        encodeURIComponent(track.videoId) +
-        "?autoplay=1&playsinline=1&rel=0&origin=" +
-        encodeURIComponent(window.location.origin);
-
-      iframeWrap.innerHTML =
-        '<iframe title="YouTube player" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen src="' +
-        esc(src) +
-        '"></iframe>';
-
-      message.textContent = "PLAYING";
-    }
-
-    updateDownloadButton();
-  }
-
-  function updateDownloadButton() {
-    const available = selected && hasFormat(selected, format);
-
-    downloadBtn.disabled = !available;
-
-    if (!selected) {
-      downloadBtn.textContent = "DOWNLOAD";
+      showToast("This video cannot be embedded. Opening YouTube.");
+      window.open("https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId), "_blank", "noopener,noreferrer");
       return;
     }
 
-    downloadBtn.textContent = available
-      ? "DOWNLOAD " + format.toUpperCase()
-      : format.toUpperCase() + " NOT IN LIBRARY";
+    selectedIndex = index;
+    playerPanel.classList.remove("hidden");
+    playerThumb.src = track.thumbnail || "";
+    playerTitle.textContent = track.title;
+    playerChannel.textContent = track.channel;
+    openYouTube.onclick = () =>
+      window.open("https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId), "_blank", "noopener,noreferrer");
 
-    downloadBtn.onclick = available ? downloadSelected : null;
+    ensurePlayer(track.videoId);
+    renderTracks();
+    renderQueue();
   }
 
-  function downloadSelected() {
-    if (!selected || !hasFormat(selected, format)) return;
-
-    const href =
-      "/api/download?videoId=" +
-      encodeURIComponent(selected.videoId) +
-      "&format=" +
-      encodeURIComponent(format);
-
-    message.textContent = "DOWNLOADING FROM R2";
-
-    const a = document.createElement("a");
-    a.href = href;
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => a.remove(), 1500);
+  function playNext() {
+    if (!tracks.length) return;
+    const next = selectedIndex < tracks.length - 1 ? selectedIndex + 1 : 0;
+    playTrack(next);
   }
 
-  searchBtn.addEventListener("click", search);
-  query.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") search();
+  function playPrev() {
+    if (!tracks.length) return;
+    const prev = selectedIndex > 0 ? selectedIndex - 1 : tracks.length - 1;
+    playTrack(prev);
+  }
+
+  window.onYouTubeIframeAPIReady = () => {};
+
+  query.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") search(query.value);
   });
 
-  results.addEventListener("click", (event) => {
-    const play = event.target.closest("[data-play]");
-    if (play) {
-      const i = Number(play.dataset.play);
-      if (tracks[i]) selectTrack(tracks[i]);
-      return;
-    }
-
-    const dl = event.target.closest("[data-download]");
-    if (dl) {
-      const i = Number(dl.dataset.download);
-      if (tracks[i]) {
-        selectTrack(tracks[i]);
-
-        if (!hasFormat(tracks[i], format)) {
-          const fallback = tracks[i].downloadFormats?.[0];
-          if (fallback) {
-            format = fallback;
-            document.querySelectorAll(".format").forEach((b) => {
-              b.classList.toggle("active", b.dataset.format === format);
-            });
-          }
-        }
-
-        updateDownloadButton();
-        downloadSelected();
-      }
-    }
+  $("heroSearch").addEventListener("click", () => {
+    query.focus();
+    window.scrollTo({top:0, behavior:"smooth"});
   });
 
-  document.querySelectorAll(".format").forEach((button) => {
+  document.querySelectorAll("[data-preset]").forEach(button => {
     button.addEventListener("click", () => {
-      document.querySelectorAll(".format").forEach((b) =>
-        b.classList.remove("active")
-      );
+      document.querySelectorAll("[data-preset]").forEach(b => b.classList.remove("active"));
       button.classList.add("active");
-      format = button.dataset.format || "mp3";
-      updateDownloadButton();
+      search(button.dataset.preset);
     });
   });
+
+  recentSearches.addEventListener("click", (e) => {
+    const button = e.target.closest("[data-recent]");
+    if (button) search(button.dataset.recent);
+  });
+
+  results.addEventListener("click", (e) => {
+    const play = e.target.closest("[data-play]");
+    if (play) return playTrack(Number(play.dataset.play));
+
+    const queueBtn = e.target.closest("[data-queue]");
+    if (queueBtn) {
+      const track = tracks[Number(queueBtn.dataset.queue)];
+      if (track) {
+        queue.push(track);
+        renderQueue();
+        showToast("Added to queue");
+      }
+      return;
+    }
+
+    const yt = e.target.closest("[data-youtube]");
+    if (yt) {
+      const track = tracks[Number(yt.dataset.youtube)];
+      if (track) window.open("https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId), "_blank", "noopener,noreferrer");
+    }
+  });
+
+  queueList.addEventListener("click", (e) => {
+    const button = e.target.closest("[data-queue-play]");
+    if (!button) return;
+    const track = queue[Number(button.dataset.queuePlay)];
+    const index = tracks.findIndex(t => t.videoId === track?.videoId);
+    if (index >= 0) playTrack(index);
+  });
+
+  loadMore.addEventListener("click", () => {
+    if (nextPageToken) search(activeQuery, true);
+  });
+
+  playPauseBtn.addEventListener("click", () => {
+    if (!playerReady || !player) return;
+    const state = player.getPlayerState();
+    if (state === YT.PlayerState.PLAYING) player.pauseVideo();
+    else player.playVideo();
+  });
+
+  nextBtn.addEventListener("click", playNext);
+  prevBtn.addEventListener("click", playPrev);
+
+  progress.addEventListener("input", () => {
+    if (!playerReady || !player?.getDuration) return;
+    const total = Number(player.getDuration() || 0);
+    player.seekTo((Number(progress.value) / 1000) * total, true);
+  });
+
+  queueToggle.addEventListener("click", () => queuePanel.classList.add("open"));
+  queueClose.addEventListener("click", () => queuePanel.classList.remove("open"));
+
+  $("themePulse").addEventListener("click", () => {
+    document.body.classList.toggle("focus-mode");
+  });
+
+  renderRecent();
 })();
