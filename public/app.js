@@ -774,18 +774,12 @@
 })();
 
 
-/* OmniGet section — server-side web engine, no local installation required. */
+/* OmniGet section — local installed-app handoff. */
 (() => {
   const urlInputs = [...document.querySelectorAll('[data-role="omniget-url"]')];
   const consentBoxes = [...document.querySelectorAll('[data-role="omniget-consent"]')];
   const openButtons = [...document.querySelectorAll('[data-action="omniget-open"]')];
-  const audioButtons = [...document.querySelectorAll('[data-action="omniget-audio"]')];
-  const videoButtons = [...document.querySelectorAll('[data-action="omniget-video"]')];
   const statuses = [...document.querySelectorAll('[data-role="omniget-status"]')];
-
-  let mode = "audio";
-  let activeJob = null;
-  let pollTimer = null;
 
   const setStatus = (message, type = "") => {
     statuses.forEach((el) => {
@@ -793,12 +787,6 @@
       el.classList.remove("ok", "error");
       if (type) el.classList.add(type);
     });
-  };
-
-  const setMode = (next) => {
-    mode = next;
-    audioButtons.forEach((b) => b.classList.toggle("active", next === "audio"));
-    videoButtons.forEach((b) => b.classList.toggle("active", next === "video"));
   };
 
   const syncUrl = (source) => {
@@ -815,39 +803,12 @@
 
   urlInputs.forEach((input) => input.addEventListener("input", () => syncUrl(input)));
   consentBoxes.forEach((box) => box.addEventListener("change", () => syncConsent(box)));
-  audioButtons.forEach((button) => button.addEventListener("click", () => setMode("audio")));
-  videoButtons.forEach((button) => button.addEventListener("click", () => setMode("video")));
-
-  const visibleUrl = () =>
-    (urlInputs.find((input) => input.offsetParent !== null)?.value || urlInputs[0]?.value || "").trim();
-
-  const validate = () => {
-    const url = visibleUrl();
-    if (!url) throw new Error("Paste a media URL first.");
-
-    let parsed;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw new Error("Enter a valid http or https URL.");
-    }
-
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      throw new Error("Only http and https links are supported.");
-    }
-
-    if (!consentBoxes.some((box) => box.checked)) {
-      throw new Error("Confirm that you own the media or have permission to save it.");
-    }
-
-    return url;
-  };
 
   const loadMeta = async () => {
     try {
       const response = await fetch("/api/omniget");
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not load OmniGet.");
+      if (!response.ok) throw new Error(data.error || "Could not load OmniGet metadata.");
 
       document.querySelectorAll('[data-role="omniget-version"]').forEach((el) => {
         el.textContent = data.release?.tag || "Latest";
@@ -861,100 +822,60 @@
           ? (stars / 1000).toFixed(1).replace(".0", "") + "K"
           : String(stars || "—");
       });
+      document.querySelectorAll('[data-role="omniget-release-link"]').forEach((el) => {
+        if (data.release?.releaseUrl) el.href = data.release.releaseUrl;
+      });
 
-      const health = await fetch("/api/omniget/health");
-      if (!health.ok) throw new Error("Backend not connected");
-      const state = await health.json();
-
-      if (!state.binary) throw new Error("OmniGet binary is not ready");
-      if (!state.allowedHostsConfigured) {
-        setStatus("OmniGet engine is online, but permitted media domains still need to be configured.", "error");
-        return;
-      }
-
-      setStatus("OmniGet web engine online. Nothing needs to be installed on this device.", "ok");
+      setStatus("Local handoff ready. OmniGet will process the link on this device.", "ok");
     } catch {
-      setStatus("OmniGet web engine is not connected yet.", "error");
+      setStatus("Local OmniGet handoff is ready. Metadata could not be loaded.", "ok");
     }
   };
 
-  const pollJob = async (jobId) => {
-    try {
-      const response = await fetch("/api/omniget/jobs/" + encodeURIComponent(jobId));
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || data.error || "Could not check job.");
+  const openInOmniGet = () => {
+    const raw =
+      (urlInputs.find((input) => input.offsetParent !== null)?.value ||
+        urlInputs[0]?.value ||
+        "").trim();
 
-      if (data.status === "queued") {
-        setStatus("Queued in OmniGet…", "ok");
-        return;
-      }
-      if (data.status === "running") {
-        setStatus("OmniGet is processing the " + mode + "…", "ok");
-        return;
-      }
-      if (data.status === "error") {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        activeJob = null;
-        setStatus(data.error || "OmniGet processing failed.", "error");
-        return;
-      }
-      if (data.status === "complete") {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        activeJob = null;
-        setStatus("Ready — starting your browser download.", "ok");
-        window.location.href = "/api/omniget/files/" + encodeURIComponent(jobId);
-      }
-    } catch (error) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-      activeJob = null;
-      setStatus(error.message || "Could not reach OmniGet.", "error");
-    }
-  };
-
-  const processMedia = async () => {
-    if (activeJob) {
-      setStatus("A job is already processing.", "ok");
+    if (!raw) {
+      setStatus("Paste a media URL first.", "error");
       return;
     }
 
+    let parsed;
     try {
-      const url = validate();
-      openButtons.forEach((button) => button.disabled = true);
-      setStatus("Sending to the OmniGet web engine…", "ok");
-
-      const response = await fetch("/api/omniget/download", {
-        method: "POST",
-        headers: {"content-type": "application/json"},
-        body: JSON.stringify({
-          url,
-          authorized: true,
-          mode
-        })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || data.error || "OmniGet could not start.");
-
-      activeJob = data.jobId;
-      setStatus("Queued in OmniGet…", "ok");
-      await pollJob(activeJob);
-      pollTimer = setInterval(() => {
-        if (activeJob) pollJob(activeJob);
-      }, 1800);
-    } catch (error) {
-      setStatus(error.message || "Could not start OmniGet.", "error");
-    } finally {
-      openButtons.forEach((button) => button.disabled = false);
+      parsed = new URL(raw);
+    } catch {
+      setStatus("Enter a valid http or https URL.", "error");
+      return;
     }
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      setStatus("Only http and https links are supported.", "error");
+      return;
+    }
+
+    if (!consentBoxes.some((box) => box.checked)) {
+      setStatus("Confirm that you own the media or have permission to save it.", "error");
+      return;
+    }
+
+    const handoff = "omniget://" + raw;
+    setStatus("Opening the local OmniGet app…", "ok");
+    window.location.href = handoff;
+
+    setTimeout(() => {
+      setStatus("If OmniGet did not open, install it locally and try again.");
+    }, 1800);
   };
 
-  openButtons.forEach((button) => button.addEventListener("click", processMedia));
-  urlInputs.forEach((input) => input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") processMedia();
-  }));
+  openButtons.forEach((button) => button.addEventListener("click", openInOmniGet));
+  urlInputs.forEach((input) => {
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") openInOmniGet();
+    });
+  });
 
-  setMode("audio");
   loadMeta();
 })();
