@@ -15,7 +15,8 @@ from pydantic import BaseModel
 
 APP_NAME = "DRAGON OmniGet Web Engine"
 TOKEN = os.environ.get("OMNIGET_WEB_TOKEN", "")
-OMNIGET_BIN = os.environ.get("OMNIGET_BIN", "/usr/local/bin/omniget")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OMNIGET_BIN = os.environ.get("OMNIGET_BIN", str(PROJECT_ROOT / ".tools" / "omniget"))
 OUTPUT_ROOT = Path(os.environ.get("OUTPUT_ROOT", "/tmp/dragon-omniget"))
 MAX_FILE_BYTES = int(os.environ.get("MAX_FILE_BYTES", str(250 * 1024 * 1024)))
 JOB_TTL_SECONDS = int(os.environ.get("JOB_TTL_SECONDS", "1800"))
