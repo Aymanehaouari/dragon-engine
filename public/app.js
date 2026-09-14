@@ -727,3 +727,48 @@
     if (raf) cancelAnimationFrame(raf);
   }, { once: true });
 })();
+
+
+/* DRAGON Signature cinematic parallax.
+   Desktop follows the pointer very subtly; mobile uses autonomous animation only. */
+(() => {
+  const root = document.documentElement;
+  const finePointer = window.matchMedia("(hover:hover) and (pointer:fine)");
+  const reduced = window.matchMedia("(prefers-reduced-motion:reduce)");
+
+  if (!finePointer.matches || reduced.matches) return;
+
+  let targetX = 0;
+  let targetY = 0;
+  let x = 0;
+  let y = 0;
+  let frame = 0;
+
+  const tick = () => {
+    x += (targetX - x) * 0.055;
+    y += (targetY - y) * 0.055;
+
+    root.style.setProperty("--lux-x", (x * 20).toFixed(2) + "px");
+    root.style.setProperty("--lux-y", (y * 14).toFixed(2) + "px");
+    root.style.setProperty("--lux-tilt-x", (-y * 1.05).toFixed(2) + "deg");
+    root.style.setProperty("--lux-tilt-y", (x * 1.35).toFixed(2) + "deg");
+
+    frame = requestAnimationFrame(tick);
+  };
+
+  window.addEventListener("pointermove", (event) => {
+    targetX = event.clientX / window.innerWidth - 0.5;
+    targetY = event.clientY / window.innerHeight - 0.5;
+  }, { passive:true });
+
+  window.addEventListener("blur", () => {
+    targetX = 0;
+    targetY = 0;
+  });
+
+  frame = requestAnimationFrame(tick);
+
+  window.addEventListener("pagehide", () => {
+    if (frame) cancelAnimationFrame(frame);
+  }, { once:true });
+})();
