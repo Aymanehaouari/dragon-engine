@@ -123,6 +123,53 @@ async function getOmniGetInfo() {
   };
 }
 
+function requireOmniGetBackend(env) {
+  const base = String(env.OMNIGET_BACKEND_URL || "").trim().replace(/\/+$/, "");
+  const token = String(env.OMNIGET_WEB_TOKEN || "").trim();
+  if (!base || !token) {
+    throw new Error("OmniGet web backend is not configured.");
+  }
+  return { base, token };
+}
+
+async function proxyOmniGet(env, path, request, options = {}) {
+  const { base, token } = requireOmniGetBackend(env);
+  const headers = new Headers();
+  headers.set("authorization", "Bearer " + token);
+
+  let body;
+  if (options.forwardBody) {
+    headers.set("content-type", "application/json");
+    body = await request.text();
+  }
+
+  const upstream = await fetch(base + path, {
+    method: options.method || request.method,
+    headers,
+    body
+  });
+
+  if (options.stream) {
+    const responseHeaders = new Headers();
+    for (const name of ["content-type", "content-length", "content-disposition", "etag", "last-modified"]) {
+      const value = upstream.headers.get(name);
+      if (value) responseHeaders.set(name, value);
+    }
+    responseHeaders.set("cache-control", "private, no-store");
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: responseHeaders
+    });
+  }
+
+  const text = await upstream.text();
+  const responseHeaders = new Headers({
+    "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8",
+    "cache-control": "no-store"
+  });
+  return new Response(text, { status: upstream.status, headers: responseHeaders });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -150,11 +197,51 @@ export default {
         });
       }
 
+
+      if (url.pathname === "/api/omniget/health") {
+        return proxyOmniGet(env, "/health", request, { method: "GET" });
+      }
+
+      if (url.pathname === "/api/omniget/info" && request.method === "POST") {
+        return proxyOmniGet(env, "/v1/info", request, {
+          method: "POST",
+          forwardBody: true
+        });
+      }
+
+      if (url.pathname === "/api/omniget/download" && request.method === "POST") {
+        return proxyOmniGet(env, "/v1/download", request, {
+          method: "POST",
+          forwardBody: true
+        });
+      }
+
+      const omnigetJob = url.pathname.match(/^\/api\/omniget\/jobs\/([a-f0-9]+)$/i);
+      if (omnigetJob && request.method === "GET") {
+        return proxyOmniGet(
+          env,
+          "/v1/jobs/" + encodeURIComponent(omnigetJob[1]),
+          request,
+          { method: "GET" }
+        );
+      }
+
+      const omnigetFile = url.pathname.match(/^\/api\/omniget\/files\/([a-f0-9]+)$/i);
+      if (omnigetFile && request.method === "GET") {
+        return proxyOmniGet(
+          env,
+          "/v1/files/" + encodeURIComponent(omnigetFile[1]),
+          request,
+          { method: "GET", stream: true }
+        );
+      }
+
       if (url.pathname === "/api/health") {
         return json({
           worker: true,
           youtubeSearch: Boolean(env.YOUTUBE_API_KEY),
-          mode: "listen-only"
+          mode: "listen-only",
+          omnigetWebConfigured: Boolean(env.OMNIGET_BACKEND_URL && env.OMNIGET_WEB_TOKEN)
         });
       }
 
