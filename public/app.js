@@ -56,6 +56,14 @@
     return n ? String(n) : "";
   }
 
+  function applyAdaptiveAccent(track) {
+    const seed = String(track?.videoId || track?.title || "DRAGON");
+    let total = 0;
+    for (let i = 0; i < seed.length; i++) total += seed.charCodeAt(i) * (i + 1);
+    const hue = 235 + (total % 56);
+    document.documentElement.style.setProperty("--accent-hue", String(hue));
+  }
+
   function showToast(text) {
     toast.textContent = text;
     toast.classList.add("show");
@@ -218,6 +226,14 @@
     }
   }
 
+    requestAnimationFrame(() => {
+      qsa(".desktop-track, .mobile-track").forEach((card, i) => {
+        card.style.animationDelay = Math.min(i * 24, 360) + "ms";
+        card.classList.add("luxury-enter");
+      });
+    });
+  }
+
   function renderQueue() {
     queueLists.forEach((root) => {
       root.innerHTML = queue.length
@@ -320,6 +336,7 @@
 
     selectedIndex = index;
     currentVideoId = track.videoId;
+    applyAdaptiveAccent(track);
 
     thumbRoots.forEach((img) => {
       img.src = track.thumbnail || "";
