@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <meta name="theme-color" content="#050505">
+  <meta name="theme-color" content="#07070a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DRAGON">
   <title>DRAGON — Music</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -17,6 +20,7 @@
       <a class="dragon-brand" href="/" aria-label="DRAGON home">
         <span class="dragon-mark">D</span>
         <span class="dragon-word">DRAGON</span>
+        <span class="signature-badge">SIGNATURE</span>
       </a>
 
       <nav class="desktop-nav">
@@ -54,12 +58,14 @@
 
       <section class="desktop-feature" data-tilt-card>
         <div class="feature-copy">
-          <p class="micro-label">NO FEED NOISE. JUST MUSIC.</p>
-          <h2>Your music,<br>without distraction.</h2>
-          <p>Search the full YouTube music catalog and listen inside a purpose-built interface.</p>
+          <p class="micro-label premium-label">SIGNATURE AUDIO EXPERIENCE</p>
+          <h2>Private sound.<br>Refined beautifully.</h2>
+          <p>A focused listening environment with cinematic depth, refined motion and a premium interface built around the music.</p>
           <button class="feature-button" data-action="focus-search">START LISTENING</button>
         </div>
         <div class="feature-art" aria-hidden="true">
+          <div class="luxury-chip chip-a">LOSSLESS FEEL</div>
+          <div class="luxury-chip chip-b">DRAGON UI</div>
           <div class="feature-orbit orbit-one"></div>
           <div class="feature-orbit orbit-two"></div>
           <div class="disc disc-back"></div>
@@ -137,15 +143,21 @@
       <a class="mobile-brand" href="/">
         <span class="dragon-mark small">D</span>
         <span>DRAGON</span>
+        <span class="mobile-signature">SIGNATURE</span>
       </a>
       <button class="mobile-avatar" data-action="open-queue" aria-label="Open queue">Q</button>
     </header>
 
     <main class="mobile-main">
       <section class="mobile-welcome">
-        <p>YOUR MUSIC SPACE</p>
-        <h1>What do you want<br>to hear?</h1>
+        <p>DRAGON SIGNATURE</p>
+        <h1>Your music.<br>Your atmosphere.</h1>
       </section>
+
+      <div class="mobile-status-row">
+        <span><i></i> YOUTUBE CONNECTED</span>
+        <span>PREMIUM LISTENING UI</span>
+      </div>
 
       <div class="mobile-search">
         <span class="search-symbol">⌕</span>
@@ -255,6 +267,7 @@
   </aside>
   <div class="sheet-backdrop" data-role="sheet-backdrop"></div>
 
+  <div class="luxury-grid" aria-hidden="true"></div>
   <div class="aurora-layer aurora-a"></div>
   <div class="aurora-layer aurora-b"></div>
   <div id="youtubeMount" class="youtube-mount" aria-hidden="true"></div>
