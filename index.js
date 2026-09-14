@@ -83,6 +83,46 @@ async function searchYouTube(env, query, pageToken = "") {
   };
 }
 
+async function getOmniGetInfo() {
+  const headers = {
+    "accept": "application/vnd.github+json",
+    "user-agent": "DRAGON-Music-App"
+  };
+
+  const [repoResponse, releaseResponse] = await Promise.all([
+    fetch("https://api.github.com/repos/tonhowtf/omniget", { headers }),
+    fetch("https://api.github.com/repos/tonhowtf/omniget/releases/latest", { headers })
+  ]);
+
+  const repoData = repoResponse.ok ? await repoResponse.json() : {};
+  const releaseData = releaseResponse.ok ? await releaseResponse.json() : {};
+
+  const assets = Array.isArray(releaseData.assets)
+    ? releaseData.assets.map((asset) => ({
+        name: asset.name,
+        size: Number(asset.size || 0),
+        downloadUrl: asset.browser_download_url
+      }))
+    : [];
+
+  return {
+    repository: "tonhowtf/omniget",
+    repositoryUrl: "https://github.com/tonhowtf/omniget",
+    description: repoData.description || "Open-source desktop media toolbox.",
+    stars: Number(repoData.stargazers_count || 0),
+    license: repoData.license?.spdx_id || "GPL-3.0",
+    release: releaseData.tag_name
+      ? {
+          tag: releaseData.tag_name,
+          name: releaseData.name || releaseData.tag_name,
+          publishedAt: releaseData.published_at || "",
+          releaseUrl: releaseData.html_url || "https://github.com/tonhowtf/omniget/releases/latest",
+          assets
+        }
+      : null
+  };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -97,6 +137,17 @@ export default {
 
         const result = await searchYouTube(env, q, pageToken);
         return json({ query: q, count: result.tracks.length, ...result });
+      }
+
+
+      if (url.pathname === "/api/omniget") {
+        const info = await getOmniGetInfo();
+        return new Response(JSON.stringify(info), {
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "public, max-age=1800"
+          }
+        });
       }
 
       if (url.pathname === "/api/health") {
