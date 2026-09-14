@@ -772,3 +772,112 @@
     if (frame) cancelAnimationFrame(frame);
   }, { once:true });
 })();
+
+
+/* OmniGet section — repository metadata + safe local-app handoff. */
+(() => {
+  const urlInputs = [...document.querySelectorAll('[data-role="omniget-url"]')];
+  const consentBoxes = [...document.querySelectorAll('[data-role="omniget-consent"]')];
+  const openButtons = [...document.querySelectorAll('[data-action="omniget-open"]')];
+  const statuses = [...document.querySelectorAll('[data-role="omniget-status"]')];
+
+  const setStatus = (message, type = "") => {
+    statuses.forEach((el) => {
+      el.textContent = message;
+      el.classList.remove("ok", "error");
+      if (type) el.classList.add(type);
+    });
+  };
+
+  const syncUrl = (source) => {
+    urlInputs.forEach((input) => {
+      if (input !== source) input.value = source.value;
+    });
+  };
+
+  const syncConsent = (source) => {
+    consentBoxes.forEach((box) => {
+      if (box !== source) box.checked = source.checked;
+    });
+  };
+
+  urlInputs.forEach((input) => {
+    input.addEventListener("input", () => syncUrl(input));
+  });
+
+  consentBoxes.forEach((box) => {
+    box.addEventListener("change", () => syncConsent(box));
+  });
+
+  const loadMeta = async () => {
+    try {
+      const response = await fetch("/api/omniget");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load OmniGet.");
+
+      document.querySelectorAll('[data-role="omniget-version"]').forEach((el) => {
+        el.textContent = data.release?.tag || "Latest";
+      });
+      document.querySelectorAll('[data-role="omniget-license"]').forEach((el) => {
+        el.textContent = data.license || "GPL-3.0";
+      });
+      document.querySelectorAll('[data-role="omniget-stars"]').forEach((el) => {
+        const stars = Number(data.stars || 0);
+        el.textContent = stars >= 1000 ? (stars / 1000).toFixed(1).replace(".0", "") + "K" : String(stars || "—");
+      });
+      document.querySelectorAll('[data-role="omniget-release-link"]').forEach((el) => {
+        if (data.release?.releaseUrl) el.href = data.release.releaseUrl;
+      });
+
+      setStatus("OmniGet repository connected. Local app handoff is ready.", "ok");
+    } catch (error) {
+      setStatus("OmniGet metadata could not be loaded right now.", "error");
+    }
+  };
+
+  const openInOmniGet = () => {
+    const url = (urlInputs.find((input) => input.offsetParent !== null)?.value || urlInputs[0]?.value || "").trim();
+    const consent = consentBoxes.some((box) => box.checked);
+
+    if (!url) {
+      setStatus("Paste a media URL first.", "error");
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      setStatus("Enter a valid http or https URL.", "error");
+      return;
+    }
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      setStatus("Only http and https media links are supported here.", "error");
+      return;
+    }
+
+    if (!consent) {
+      setStatus("Confirm that you own the media or have permission to save it.", "error");
+      return;
+    }
+
+    const handoff = "omniget://" + url;
+    setStatus("Opening OmniGet on this device…", "ok");
+    window.location.href = handoff;
+
+    setTimeout(() => {
+      setStatus("If OmniGet did not open, install it from the button above, then try again.");
+    }, 1800);
+  };
+
+  openButtons.forEach((button) => button.addEventListener("click", openInOmniGet));
+
+  urlInputs.forEach((input) => {
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") openInOmniGet();
+    });
+  });
+
+  loadMeta();
+})();
