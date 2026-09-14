@@ -396,6 +396,14 @@
     });
   });
 
+  qsa('[data-action="search-button"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const scope = button.closest(".mobile-search, .desktop-search");
+      const input = scope?.querySelector('[data-role="search-input"]');
+      search(input?.value || "");
+    });
+  });
+
   qsa("[data-preset]").forEach((button) => {
     button.addEventListener("click", () => {
       qsa("[data-preset]").forEach((item) => item.classList.remove("active"));
@@ -518,4 +526,62 @@
   });
 
   renderRecent();
+})();
+
+
+(() => {
+  if (
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    window.matchMedia("(pointer: coarse)").matches
+  ) {
+    return;
+  }
+
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+  document.querySelectorAll("[data-tilt-card]").forEach((card) => {
+    card.addEventListener("mousemove", (event) => {
+      const rect = card.getBoundingClientRect();
+      const px = (event.clientX - rect.left) / rect.width - 0.5;
+      const py = (event.clientY - rect.top) / rect.height - 0.5;
+
+      const ry = clamp(px * 7, -4.5, 4.5);
+      const rx = clamp(-py * 7, -4.5, 4.5);
+
+      card.style.transform =
+        "perspective(1200px) rotateX(" +
+        rx +
+        "deg) rotateY(" +
+        ry +
+        "deg) translateZ(0)";
+    });
+
+    card.addEventListener("mouseleave", () => {
+      card.style.transform = "";
+    });
+  });
+
+  document.querySelectorAll("[data-tilt-soft]").forEach((card) => {
+    card.addEventListener("mousemove", (event) => {
+      const rect = card.getBoundingClientRect();
+      const px = (event.clientX - rect.left) / rect.width - 0.5;
+      const py = (event.clientY - rect.top) / rect.height - 0.5;
+
+      card.style.transform =
+        "perspective(1000px) rotateX(" +
+        (-py * 2.2) +
+        "deg) rotateY(" +
+        (px * 2.2) +
+        "deg)";
+    });
+
+    card.addEventListener("mouseleave", () => {
+      card.style.transform = "";
+    });
+  });
+
+  document.addEventListener("pointermove", (event) => {
+    document.documentElement.style.setProperty("--pointer-x", event.clientX + "px");
+    document.documentElement.style.setProperty("--pointer-y", event.clientY + "px");
+  });
 })();
