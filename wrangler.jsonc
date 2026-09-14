@@ -7,11 +7,17 @@
     "directory": "./public",
     "binding": "ASSETS"
   },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "dragon-media"
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {
-        "name": "CHANNEL_REGISTRY",
-        "class_name": "ChannelRegistry"
+        "name": "MEDIA_REGISTRY",
+        "class_name": "MediaRegistry"
       }
     ]
   },
@@ -27,6 +33,11 @@
     {
       "tag": "v3",
       "new_sqlite_classes": ["ChannelRegistry"]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": ["MediaRegistry"],
+      "deleted_classes": ["ChannelRegistry"]
     }
   ],
   "observability": {
