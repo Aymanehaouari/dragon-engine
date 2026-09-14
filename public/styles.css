@@ -2890,3 +2890,17 @@ body::before{
   }
   .mobile-omniget-card .omniget-status{display:block;margin-top:11px}
 }
+
+.omniget-mode,.omniget-mobile-mode{
+  cursor:pointer;
+}
+.omniget-mode.active,.omniget-mobile-mode.active{
+  color:#150d05!important;
+  border-color:rgba(242,133,0,.32)!important;
+  background:linear-gradient(135deg,#ffd7ad,#f2a35f 58%,#dc7e27)!important;
+  box-shadow:0 10px 28px rgba(242,133,0,.12);
+}
+[data-action="omniget-open"]:disabled{
+  opacity:.55;
+  cursor:wait;
+}
