@@ -585,3 +585,31 @@
     document.documentElement.style.setProperty("--pointer-y", event.clientY + "px");
   });
 })();
+
+
+/* Mobile app shell: keep the page fixed horizontally and disable pinch zoom. */
+(() => {
+  if (!window.matchMedia("(max-width: 760px)").matches) return;
+
+  const stopGesture = (event) => {
+    event.preventDefault();
+  };
+
+  document.addEventListener("gesturestart", stopGesture, { passive: false });
+  document.addEventListener("gesturechange", stopGesture, { passive: false });
+  document.addEventListener("gestureend", stopGesture, { passive: false });
+
+  document.addEventListener(
+    "touchmove",
+    (event) => {
+      if (event.touches && event.touches.length > 1) {
+        event.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+
+  window.addEventListener("orientationchange", () => {
+    window.scrollTo({ left: 0, top: window.scrollY });
+  });
+})();
