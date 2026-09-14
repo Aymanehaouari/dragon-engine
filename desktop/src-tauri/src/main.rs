@@ -105,10 +105,10 @@ async fn omniget_download(
 
     let output = tauri::async_runtime::spawn_blocking(move || {
         let current_path = env::var_os("PATH").unwrap_or_default();
-        let joined = env::join_paths(
-            std::iter::once(tools_for_task.as_os_str())
-                .chain(env::split_paths(&current_path).map(|p| p.as_os_str().to_owned()).collect::<Vec<_>>().iter().map(|p| p.as_os_str()))
-        ).map_err(|e| format!("Could not prepare bundled tools: {e}"))?;
+        let mut paths = vec![tools_for_task.clone()];
+        paths.extend(env::split_paths(&current_path));
+        let joined = env::join_paths(paths)
+            .map_err(|e| format!("Could not prepare bundled tools: {e}"))?;
 
         let mut command = Command::new(omniget_for_task);
         command.args(args).env("PATH", joined);
