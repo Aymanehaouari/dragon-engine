@@ -224,7 +224,6 @@
         })
         .join("");
     }
-  }
 
     requestAnimationFrame(() => {
       qsa(".desktop-track, .mobile-track").forEach((card, i) => {
