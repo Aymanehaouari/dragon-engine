@@ -3,79 +3,126 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#050505">
-  <title>DRAGON</title>
+  <meta name="theme-color" content="#070707">
+  <title>DRAGON — Music</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="cursor-light" id="cursorLight"></div>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
 
-  <header class="nav">
-    <div class="logo"><span>D</span>RAGON</div>
-    <div style="display:flex;gap:14px;align-items:center">
-      <a href="/admin.html" style="color:#888;text-decoration:none;font-size:10px;letter-spacing:.16em">MEDIA ADMIN</a>
-      <div class="status" id="status">READY</div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="DRAGON home">
+      <span class="brand-mark">D</span>
+      <span>DRAGON</span>
+    </a>
+
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input id="query" autocomplete="off" placeholder="Search songs, artists, albums...">
+      <kbd>ENTER</kbd>
+    </div>
+
+    <div class="top-actions">
+      <button id="themePulse" class="ghost-button" type="button">FOCUS</button>
+      <div class="live-dot"><span></span>LIVE</div>
     </div>
   </header>
 
-  <main class="page">
-    <section class="hero">
-      <div class="kicker">DISCOVER // LISTEN // DOWNLOAD FROM YOUR LIBRARY</div>
-      <h1>DRAGON</h1>
-      <p>Search and listen with YouTube. Downloads come directly from your private Cloudflare R2 library, so the download request itself does not contact YouTube or use Render.</p>
-    </section>
+  <main class="app-shell">
+    <aside class="sidebar">
+      <div class="side-label">DISCOVER</div>
+      <button class="nav-item active" data-preset="global hits">✦ For You</button>
+      <button class="nav-item" data-preset="new music 2026">◌ New Releases</button>
+      <button class="nav-item" data-preset="top songs 2026">↗ Trending</button>
+      <button class="nav-item" data-preset="live music performances">◉ Live</button>
 
-    <section class="search-panel tilt">
-      <div class="search-row">
-        <input id="query" autocomplete="off" placeholder="Search song, artist, album...">
-        <button id="searchBtn">SEARCH</button>
+      <div class="side-label recent-label">RECENT SEARCHES</div>
+      <div id="recentSearches" class="recent-searches"></div>
+
+      <div class="side-footer">
+        <div class="mini-logo">DRAGON</div>
+        <p>Minimal interface. Maximum focus.</p>
       </div>
-      <div class="format-row">
-        <span>DOWNLOAD FORMAT</span>
-        <button class="format active" data-format="mp3">MP3</button>
-        <button class="format" data-format="mp4">MP4</button>
-      </div>
-    </section>
+    </aside>
 
-    <section class="layout">
-      <div class="results-shell">
-        <div class="section-head">
-          <span>RESULTS</span>
-          <span id="count">0</span>
+    <section class="content">
+      <section class="hero-card">
+        <div>
+          <div class="eyebrow">DRAGON RADIO // YOUTUBE POWERED</div>
+          <h1>Music without the noise.</h1>
+          <p>Search the entire YouTube music catalog in a cleaner, faster interface built around listening.</p>
         </div>
-        <div id="results" class="results">
-          <div class="empty">SEARCH FOR A TRACK</div>
-        </div>
-      </div>
+        <button id="heroSearch" class="primary-button" type="button">EXPLORE NOW</button>
+      </section>
 
-      <aside class="player-shell tilt">
-        <div class="section-head">
-          <span>NOW PLAYING</span>
-          <span>YOUTUBE</span>
+      <section class="section-block">
+        <div class="section-title-row">
+          <div>
+            <div class="eyebrow">DISCOVERY</div>
+            <h2 id="resultsTitle">Recommended for you</h2>
+          </div>
+          <div class="result-meta"><span id="count">0</span> tracks</div>
         </div>
 
-        <div class="cover-wrap">
-          <img id="cover" src="" alt="">
-          <div class="cover-placeholder" id="coverPlaceholder">D</div>
+        <div id="results" class="tracks-grid">
+          <div class="empty-state">
+            <div class="empty-symbol">D</div>
+            <h3>Start with a search</h3>
+            <p>Find any artist, song, remix, live performance or album.</p>
+          </div>
         </div>
 
-        <h2 id="nowTitle">No track selected</h2>
-        <p id="nowChannel">Choose a result to listen.</p>
-
-        <div class="iframe-wrap" id="iframeWrap">
-          <div class="player-empty">PLAYER</div>
+        <div class="load-more-wrap">
+          <button id="loadMore" class="ghost-button" hidden>LOAD MORE</button>
         </div>
-
-        <div class="player-actions">
-          <button id="openBtn" disabled>OPEN IN YOUTUBE</button>
-          <button id="downloadBtn" class="white" disabled>DOWNLOAD</button>
-        </div>
-
-        <div class="message" id="message">DRAGON ONLINE</div>
-      </aside>
+      </section>
     </section>
   </main>
 
+  <section id="playerPanel" class="player-panel hidden">
+    <div class="player-media">
+      <img id="playerThumb" alt="">
+      <div class="player-copy">
+        <div id="playerTitle" class="player-title">Nothing playing</div>
+        <div id="playerChannel" class="player-channel">DRAGON</div>
+      </div>
+    </div>
+
+    <div class="player-center">
+      <div class="player-controls">
+        <button id="prevBtn" type="button" aria-label="Previous">⏮</button>
+        <button id="playPauseBtn" class="play-main" type="button" aria-label="Play/Pause">▶</button>
+        <button id="nextBtn" type="button" aria-label="Next">⏭</button>
+      </div>
+      <div class="progress-row">
+        <span id="currentTime">0:00</span>
+        <input id="progress" type="range" min="0" max="1000" value="0">
+        <span id="duration">0:00</span>
+      </div>
+    </div>
+
+    <div class="player-right">
+      <button id="openYouTube" class="player-link" type="button">YOUTUBE ↗</button>
+      <button id="queueToggle" class="player-link" type="button">QUEUE</button>
+    </div>
+  </section>
+
+  <aside id="queuePanel" class="queue-panel">
+    <div class="queue-head">
+      <div>
+        <div class="eyebrow">UP NEXT</div>
+        <h3>Queue</h3>
+      </div>
+      <button id="queueClose" class="icon-button" type="button">×</button>
+    </div>
+    <div id="queueList" class="queue-list"></div>
+  </aside>
+
+  <div id="youtubeMount" class="youtube-mount" aria-hidden="true"></div>
+  <div id="toast" class="toast"></div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
   <script src="/app.js"></script>
 </body>
 </html>
