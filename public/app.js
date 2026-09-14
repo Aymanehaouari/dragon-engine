@@ -1,29 +1,23 @@
 (() => {
   "use strict";
 
-  const $ = (id) => document.getElementById(id);
-  const query = $("query");
-  const results = $("results");
-  const count = $("count");
-  const resultsTitle = $("resultsTitle");
-  const loadMore = $("loadMore");
-  const playerPanel = $("playerPanel");
-  const playerThumb = $("playerThumb");
-  const playerTitle = $("playerTitle");
-  const playerChannel = $("playerChannel");
-  const playPauseBtn = $("playPauseBtn");
-  const prevBtn = $("prevBtn");
-  const nextBtn = $("nextBtn");
-  const progress = $("progress");
-  const currentTime = $("currentTime");
-  const duration = $("duration");
-  const openYouTube = $("openYouTube");
-  const queueToggle = $("queueToggle");
-  const queuePanel = $("queuePanel");
-  const queueClose = $("queueClose");
-  const queueList = $("queueList");
-  const recentSearches = $("recentSearches");
-  const toast = $("toast");
+  const qs = (selector, root = document) => root.querySelector(selector);
+  const qsa = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+  const searchInputs = qsa('[data-role="search-input"]');
+  const resultsRoots = qsa('[data-role="results"]');
+  const titleRoots = qsa('[data-role="results-title"]');
+  const countRoots = qsa('[data-role="count"]');
+  const loadButtons = qsa('[data-action="load-more"]');
+  const thumbRoots = qsa('[data-role="player-thumb"]');
+  const playerTitleRoots = qsa('[data-role="player-title"]');
+  const playerChannelRoots = qsa('[data-role="player-channel"]');
+  const progressRoots = qsa('[data-role="progress"]');
+  const currentTimeRoots = qsa('[data-role="current-time"]');
+  const durationRoots = qsa('[data-role="duration"]');
+  const playButtons = qsa('[data-action="play-pause"]');
+  const queueLists = qsa('[data-role="queue-list"]');
+  const toast = qs("#toast");
 
   let tracks = [];
   let queue = [];
@@ -33,14 +27,15 @@
   let player = null;
   let playerReady = false;
   let progressTimer = null;
+  let currentVideoId = "";
 
   function esc(value) {
     return String(value ?? "")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 
   function fmtTime(seconds) {
@@ -48,54 +43,79 @@
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
     const sec = s % 60;
-    return h ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${m}:${String(sec).padStart(2,"0")}`;
+    return h
+      ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+      : `${m}:${String(sec).padStart(2, "0")}`;
   }
 
   function fmtViews(value) {
     const n = Number(value || 0);
-    if (n >= 1e9) return (n/1e9).toFixed(1).replace(".0","") + "B";
-    if (n >= 1e6) return (n/1e6).toFixed(1).replace(".0","") + "M";
-    if (n >= 1e3) return (n/1e3).toFixed(1).replace(".0","") + "K";
+    if (n >= 1e9) return (n / 1e9).toFixed(1).replace(".0", "") + "B";
+    if (n >= 1e6) return (n / 1e6).toFixed(1).replace(".0", "") + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1).replace(".0", "") + "K";
     return n ? String(n) : "";
   }
 
   function showToast(text) {
     toast.textContent = text;
     toast.classList.add("show");
-    clearTimeout(showToast._t);
-    showToast._t = setTimeout(() => toast.classList.remove("show"), 1800);
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => toast.classList.remove("show"), 1800);
   }
 
-  function saveRecent(q) {
+  function saveRecent(query) {
     const current = JSON.parse(localStorage.getItem("dragon_recent") || "[]");
-    const next = [q, ...current.filter(x => x.toLowerCase() !== q.toLowerCase())].slice(0, 6);
+    const next = [
+      query,
+      ...current.filter((x) => x.toLowerCase() !== query.toLowerCase())
+    ].slice(0, 7);
+
     localStorage.setItem("dragon_recent", JSON.stringify(next));
     renderRecent();
   }
 
   function renderRecent() {
     const items = JSON.parse(localStorage.getItem("dragon_recent") || "[]");
-    recentSearches.innerHTML = items.length
-      ? items.map(q => `<button data-recent="${esc(q)}">${esc(q)}</button>`).join("")
-      : '<div class="recent-empty">No searches yet</div>';
+    qsa('[data-role="recent-list"]').forEach((root) => {
+      root.innerHTML = items.length
+        ? items
+            .map(
+              (item) =>
+                `<button data-recent="${esc(item)}">${esc(item)}</button>`
+            )
+            .join("")
+        : '<span class="recent-empty">Nothing yet</span>';
+    });
   }
 
-  async function search(q, append = false) {
-    q = String(q || "").trim();
+  function syncSearchInputs(value) {
+    searchInputs.forEach((input) => {
+      input.value = value;
+    });
+  }
+
+  async function search(query, append = false) {
+    const q = String(query || "").trim();
     if (!q) return;
 
     if (!append) {
       activeQuery = q;
       saveRecent(q);
-      results.innerHTML = '<div class="loading-state"><div class="loader"></div><span>Searching DRAGON...</span></div>';
-      count.textContent = "0";
-      resultsTitle.textContent = q;
+      syncSearchInputs(q);
+      titleRoots.forEach((el) => (el.textContent = q));
+      countRoots.forEach((el) => (el.textContent = "0"));
+      resultsRoots.forEach((root) => {
+        root.innerHTML =
+          '<div class="searching"><span class="spinner"></span><strong>Searching DRAGON</strong></div>';
+      });
       nextPageToken = null;
     }
 
     const url = new URL("/api/search", location.origin);
     url.searchParams.set("q", q);
-    if (append && nextPageToken) url.searchParams.set("pageToken", nextPageToken);
+    if (append && nextPageToken) {
+      url.searchParams.set("pageToken", nextPageToken);
+    }
 
     try {
       const response = await fetch(url);
@@ -104,67 +124,126 @@
 
       const incoming = Array.isArray(data.tracks) ? data.tracks : [];
       tracks = append ? [...tracks, ...incoming] : incoming;
-      queue = tracks.slice();
+      if (!append) queue = tracks.slice();
+
       nextPageToken = data.nextPageToken || null;
-      renderTracks();
+      renderResults();
       renderQueue();
-      loadMore.hidden = !nextPageToken;
-      query.value = q;
+
+      loadButtons.forEach((button) => {
+        button.hidden = !nextPageToken;
+      });
     } catch (error) {
       if (!append) {
-        results.innerHTML = `<div class="empty-state"><h3>Search failed</h3><p>${esc(error.message)}</p></div>`;
+        resultsRoots.forEach((root) => {
+          root.innerHTML =
+            `<div class="search-error"><strong>Search failed</strong><span>${esc(
+              error.message
+            )}</span></div>`;
+        });
       }
       showToast(error.message || "Search failed");
     }
   }
 
-  function renderTracks() {
-    count.textContent = String(tracks.length);
+  function renderResults() {
+    countRoots.forEach((el) => (el.textContent = String(tracks.length)));
+
+    const desktopRoot = qs(".desktop-results");
+    const mobileRoot = qs(".mobile-results");
 
     if (!tracks.length) {
-      results.innerHTML = '<div class="empty-state"><h3>No results</h3><p>Try a different search.</p></div>';
+      if (desktopRoot) {
+        desktopRoot.innerHTML =
+          '<div class="desktop-empty"><div class="empty-mark">D</div><h4>No results</h4><p>Try a different search.</p></div>';
+      }
+      if (mobileRoot) {
+        mobileRoot.innerHTML =
+          '<div class="mobile-empty"><div class="mobile-empty-mark">D</div><strong>No results</strong><span>Try another search.</span></div>';
+      }
       return;
     }
 
-    results.innerHTML = tracks.map((track, index) => {
-      const views = fmtViews(track.views);
-      const meta = [track.channel, views ? views + " views" : "", track.durationSeconds ? fmtTime(track.durationSeconds) : ""]
-        .filter(Boolean).join(" · ");
+    if (desktopRoot) {
+      desktopRoot.innerHTML = tracks
+        .map((track, index) => {
+          const views = fmtViews(track.views);
+          return `
+            <article class="desktop-track ${selectedIndex === index ? "active" : ""}">
+              <button class="desktop-cover" data-play="${index}">
+                <img src="${esc(track.thumbnail)}" alt="">
+                <span class="desktop-play">▶</span>
+              </button>
+              <div class="desktop-track-copy">
+                <h4>${esc(track.title)}</h4>
+                <p>${esc(track.channel)}</p>
+                <div>
+                  ${views ? `<span>${views} views</span>` : ""}
+                  ${track.durationSeconds ? `<span>${fmtTime(track.durationSeconds)}</span>` : ""}
+                </div>
+              </div>
+              <div class="desktop-track-actions">
+                <button data-queue="${index}" title="Add to queue">＋</button>
+                <button data-youtube="${index}" title="Open on YouTube">↗</button>
+              </div>
+            </article>
+          `;
+        })
+        .join("");
+    }
 
-      return `
-        <article class="track-card ${selectedIndex === index ? "active" : ""}" data-index="${index}">
-          <button class="cover-button" data-play="${index}" type="button">
-            <img src="${esc(track.thumbnail)}" alt="">
-            <span class="cover-overlay"><span class="cover-play">▶</span></span>
-          </button>
-          <div class="track-info">
-            <div class="track-title">${esc(track.title)}</div>
-            <div class="track-meta">${esc(meta)}</div>
-          </div>
-          <div class="track-actions">
-            <button data-queue="${index}" type="button" title="Add to queue">＋</button>
-            <button data-youtube="${index}" type="button" title="Open on YouTube">↗</button>
-          </div>
-        </article>
-      `;
-    }).join("");
+    if (mobileRoot) {
+      mobileRoot.innerHTML = tracks
+        .map((track, index) => {
+          const views = fmtViews(track.views);
+          const meta = [track.channel, views ? views + " views" : ""]
+            .filter(Boolean)
+            .join(" · ");
+
+          return `
+            <article class="mobile-track ${selectedIndex === index ? "active" : ""}" data-play="${index}">
+              <div class="mobile-track-image">
+                <img src="${esc(track.thumbnail)}" alt="">
+                <span>${track.durationSeconds ? fmtTime(track.durationSeconds) : "▶"}</span>
+              </div>
+              <div class="mobile-track-copy">
+                <h3>${esc(track.title)}</h3>
+                <p>${esc(meta)}</p>
+              </div>
+              <button class="mobile-more" data-queue="${index}" aria-label="Add to queue">＋</button>
+            </article>
+          `;
+        })
+        .join("");
+    }
   }
 
   function renderQueue() {
-    queueList.innerHTML = queue.length
-      ? queue.map((track, index) => `
-          <button class="queue-item ${tracks[selectedIndex]?.videoId === track.videoId ? "active" : ""}" data-queue-play="${index}" type="button">
-            <img src="${esc(track.thumbnail)}" alt="">
-            <span>
-              <strong>${esc(track.title)}</strong>
-              <small>${esc(track.channel)}</small>
-            </span>
-          </button>
-        `).join("")
-      : '<div class="recent-empty">Queue is empty</div>';
+    queueLists.forEach((root) => {
+      root.innerHTML = queue.length
+        ? queue
+            .map(
+              (track, index) => `
+                <button class="queue-item ${
+                  currentVideoId === track.videoId ? "active" : ""
+                }" data-queue-play="${index}">
+                  <img src="${esc(track.thumbnail)}" alt="">
+                  <span>
+                    <strong>${esc(track.title)}</strong>
+                    <small>${esc(track.channel)}</small>
+                  </span>
+                  <em>▶</em>
+                </button>
+              `
+            )
+            .join("")
+        : '<div class="queue-empty">Your queue is empty.</div>';
+    });
   }
 
   function ensurePlayer(videoId) {
+    currentVideoId = videoId;
+
     if (playerReady && player) {
       player.loadVideoById(videoId);
       return;
@@ -172,7 +251,7 @@
 
     const mount = document.createElement("div");
     mount.id = "yt-player";
-    $("youtubeMount").replaceChildren(mount);
+    qs("#youtubeMount").replaceChildren(mount);
 
     player = new YT.Player("yt-player", {
       height: "1",
@@ -198,11 +277,12 @@
 
   function handlePlayerState(event) {
     if (!window.YT) return;
+
     if (event.data === YT.PlayerState.PLAYING) {
-      playPauseBtn.textContent = "❚❚";
+      playButtons.forEach((button) => (button.textContent = "❚❚"));
       startProgressLoop();
     } else if (event.data === YT.PlayerState.PAUSED) {
-      playPauseBtn.textContent = "▶";
+      playButtons.forEach((button) => (button.textContent = "▶"));
     } else if (event.data === YT.PlayerState.ENDED) {
       playNext();
     }
@@ -210,13 +290,17 @@
 
   function startProgressLoop() {
     clearInterval(progressTimer);
+
     progressTimer = setInterval(() => {
       if (!playerReady || !player?.getDuration) return;
+
       const now = Number(player.getCurrentTime?.() || 0);
       const total = Number(player.getDuration?.() || 0);
-      currentTime.textContent = fmtTime(now);
-      duration.textContent = fmtTime(total);
-      progress.value = total ? String(Math.round((now / total) * 1000)) : "0";
+      const value = total ? Math.round((now / total) * 1000) : 0;
+
+      currentTimeRoots.forEach((el) => (el.textContent = fmtTime(now)));
+      durationRoots.forEach((el) => (el.textContent = fmtTime(total)));
+      progressRoots.forEach((el) => (el.value = String(value)));
     }, 500);
   }
 
@@ -225,115 +309,212 @@
     if (!track) return;
 
     if (track.embeddable === false) {
-      showToast("This video cannot be embedded. Opening YouTube.");
-      window.open("https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId), "_blank", "noopener,noreferrer");
+      showToast("This video cannot play inside DRAGON.");
+      window.open(
+        "https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId),
+        "_blank",
+        "noopener,noreferrer"
+      );
       return;
     }
 
     selectedIndex = index;
-    playerPanel.classList.remove("hidden");
-    playerThumb.src = track.thumbnail || "";
-    playerTitle.textContent = track.title;
-    playerChannel.textContent = track.channel;
-    openYouTube.onclick = () =>
-      window.open("https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId), "_blank", "noopener,noreferrer");
+    currentVideoId = track.videoId;
+
+    thumbRoots.forEach((img) => {
+      img.src = track.thumbnail || "";
+    });
+    playerTitleRoots.forEach((el) => (el.textContent = track.title));
+    playerChannelRoots.forEach((el) => (el.textContent = track.channel));
+
+    qsa('[data-action="open-youtube"]').forEach((button) => {
+      button.disabled = false;
+      button.onclick = () =>
+        window.open(
+          "https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId),
+          "_blank",
+          "noopener,noreferrer"
+        );
+    });
+
+    qs('[data-role="desktop-player"]')?.classList.remove("idle");
+    qs('[data-role="mobile-mini-player"]')?.classList.remove("hidden");
 
     ensurePlayer(track.videoId);
-    renderTracks();
+    renderResults();
     renderQueue();
   }
 
   function playNext() {
     if (!tracks.length) return;
-    const next = selectedIndex < tracks.length - 1 ? selectedIndex + 1 : 0;
-    playTrack(next);
+    playTrack(selectedIndex < tracks.length - 1 ? selectedIndex + 1 : 0);
   }
 
   function playPrev() {
     if (!tracks.length) return;
-    const prev = selectedIndex > 0 ? selectedIndex - 1 : tracks.length - 1;
-    playTrack(prev);
+    playTrack(selectedIndex > 0 ? selectedIndex - 1 : tracks.length - 1);
+  }
+
+  function togglePlay() {
+    if (!playerReady || !player || !window.YT) return;
+    const state = player.getPlayerState();
+    if (state === YT.PlayerState.PLAYING) player.pauseVideo();
+    else player.playVideo();
+  }
+
+  function openQueue() {
+    qs('[data-role="queue-sheet"]')?.classList.add("open");
+    qs('[data-role="sheet-backdrop"]')?.classList.add("show");
+    renderQueue();
+  }
+
+  function closeQueue() {
+    qs('[data-role="queue-sheet"]')?.classList.remove("open");
+    if (!qs('[data-role="mobile-player-sheet"]')?.classList.contains("open")) {
+      qs('[data-role="sheet-backdrop"]')?.classList.remove("show");
+    }
+  }
+
+  function openMobilePlayer() {
+    if (selectedIndex < 0) return;
+    qs('[data-role="mobile-player-sheet"]')?.classList.add("open");
+    qs('[data-role="sheet-backdrop"]')?.classList.add("show");
+  }
+
+  function closeMobilePlayer() {
+    qs('[data-role="mobile-player-sheet"]')?.classList.remove("open");
+    if (!qs('[data-role="queue-sheet"]')?.classList.contains("open")) {
+      qs('[data-role="sheet-backdrop"]')?.classList.remove("show");
+    }
   }
 
   window.onYouTubeIframeAPIReady = () => {};
 
-  query.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") search(query.value);
+  searchInputs.forEach((input) => {
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") search(input.value);
+    });
   });
 
-  $("heroSearch").addEventListener("click", () => {
-    query.focus();
-    window.scrollTo({top:0, behavior:"smooth"});
-  });
-
-  document.querySelectorAll("[data-preset]").forEach(button => {
+  qsa("[data-preset]").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll("[data-preset]").forEach(b => b.classList.remove("active"));
+      qsa("[data-preset]").forEach((item) => item.classList.remove("active"));
       button.classList.add("active");
       search(button.dataset.preset);
     });
   });
 
-  recentSearches.addEventListener("click", (e) => {
-    const button = e.target.closest("[data-recent]");
-    if (button) search(button.dataset.recent);
+  qsa('[data-role="recent-list"]').forEach((root) => {
+    root.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-recent]");
+      if (button) search(button.dataset.recent);
+    });
   });
 
-  results.addEventListener("click", (e) => {
-    const play = e.target.closest("[data-play]");
-    if (play) return playTrack(Number(play.dataset.play));
-
-    const queueBtn = e.target.closest("[data-queue]");
-    if (queueBtn) {
-      const track = tracks[Number(queueBtn.dataset.queue)];
-      if (track) {
-        queue.push(track);
-        renderQueue();
-        showToast("Added to queue");
+  resultsRoots.forEach((root) => {
+    root.addEventListener("click", (event) => {
+      const queueButton = event.target.closest("[data-queue]");
+      if (queueButton) {
+        event.stopPropagation();
+        const track = tracks[Number(queueButton.dataset.queue)];
+        if (track) {
+          queue.push(track);
+          renderQueue();
+          showToast("Added to queue");
+        }
+        return;
       }
-      return;
-    }
 
-    const yt = e.target.closest("[data-youtube]");
-    if (yt) {
-      const track = tracks[Number(yt.dataset.youtube)];
-      if (track) window.open("https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId), "_blank", "noopener,noreferrer");
-    }
+      const youtubeButton = event.target.closest("[data-youtube]");
+      if (youtubeButton) {
+        event.stopPropagation();
+        const track = tracks[Number(youtubeButton.dataset.youtube)];
+        if (track) {
+          window.open(
+            "https://www.youtube.com/watch?v=" +
+              encodeURIComponent(track.videoId),
+            "_blank",
+            "noopener,noreferrer"
+          );
+        }
+        return;
+      }
+
+      const play = event.target.closest("[data-play]");
+      if (play) playTrack(Number(play.dataset.play));
+    });
   });
 
-  queueList.addEventListener("click", (e) => {
-    const button = e.target.closest("[data-queue-play]");
-    if (!button) return;
-    const track = queue[Number(button.dataset.queuePlay)];
-    const index = tracks.findIndex(t => t.videoId === track?.videoId);
-    if (index >= 0) playTrack(index);
+  qsa('[data-action="prev"]').forEach((button) =>
+    button.addEventListener("click", playPrev)
+  );
+  qsa('[data-action="next"]').forEach((button) =>
+    button.addEventListener("click", playNext)
+  );
+  playButtons.forEach((button) =>
+    button.addEventListener("click", togglePlay)
+  );
+
+  progressRoots.forEach((input) => {
+    input.addEventListener("input", () => {
+      if (!playerReady || !player?.getDuration) return;
+      const total = Number(player.getDuration() || 0);
+      player.seekTo((Number(input.value) / 1000) * total, true);
+    });
   });
 
-  loadMore.addEventListener("click", () => {
-    if (nextPageToken) search(activeQuery, true);
+  loadButtons.forEach((button) =>
+    button.addEventListener("click", () => {
+      if (nextPageToken) search(activeQuery, true);
+    })
+  );
+
+  qsa('[data-action="focus-search"]').forEach((button) =>
+    button.addEventListener("click", () => {
+      const input = qs(".desktop-search input");
+      input?.focus();
+      input?.scrollIntoView({ behavior: "smooth", block: "center" });
+    })
+  );
+
+  qsa('[data-action="open-queue"]').forEach((button) =>
+    button.addEventListener("click", openQueue)
+  );
+  qsa('[data-action="close-queue"]').forEach((button) =>
+    button.addEventListener("click", closeQueue)
+  );
+  qsa('[data-action="open-mobile-player"]').forEach((button) =>
+    button.addEventListener("click", openMobilePlayer)
+  );
+  qsa('[data-action="close-mobile-player"]').forEach((button) =>
+    button.addEventListener("click", closeMobilePlayer)
+  );
+
+  qsa('[data-role="queue-list"]').forEach((root) => {
+    root.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-queue-play]");
+      if (!button) return;
+      const track = queue[Number(button.dataset.queuePlay)];
+      const index = tracks.findIndex((item) => item.videoId === track?.videoId);
+      if (index >= 0) {
+        playTrack(index);
+        closeQueue();
+      }
+    });
   });
 
-  playPauseBtn.addEventListener("click", () => {
-    if (!playerReady || !player) return;
-    const state = player.getPlayerState();
-    if (state === YT.PlayerState.PLAYING) player.pauseVideo();
-    else player.playVideo();
+  qs('[data-action="search-tab"]')?.addEventListener("click", () => {
+    qs(".mobile-search input")?.focus();
+    qs(".mobile-search")?.scrollIntoView({ behavior: "smooth", block: "center" });
   });
 
-  nextBtn.addEventListener("click", playNext);
-  prevBtn.addEventListener("click", playPrev);
-
-  progress.addEventListener("input", () => {
-    if (!playerReady || !player?.getDuration) return;
-    const total = Number(player.getDuration() || 0);
-    player.seekTo((Number(progress.value) / 1000) * total, true);
+  qs('[data-action="home-tab"]')?.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
   });
 
-  queueToggle.addEventListener("click", () => queuePanel.classList.add("open"));
-  queueClose.addEventListener("click", () => queuePanel.classList.remove("open"));
-
-  $("themePulse").addEventListener("click", () => {
-    document.body.classList.toggle("focus-mode");
+  qs('[data-role="sheet-backdrop"]')?.addEventListener("click", () => {
+    closeQueue();
+    closeMobilePlayer();
   });
 
   renderRecent();
