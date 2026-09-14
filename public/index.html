@@ -99,12 +99,12 @@
         <div class="omniget-panel">
           <div class="omniget-copy">
             <span class="omniget-kicker">POWERED ONLY BY OMNIGET</span>
-            <h3>Use OmniGet directly in DRAGON.</h3>
-            <p>Paste a permitted media link. DRAGON sends it to the OmniGet engine running on the server, so nothing needs to be installed on this device.</p>
+            <h3>Use your local OmniGet directly from DRAGON.</h3>
+            <p>Paste a media link and DRAGON will hand it to the OmniGet app installed on this computer. Processing stays on your device.</p>
 
             <div class="omniget-input-row">
               <input data-role="omniget-url" type="url" inputmode="url" autocomplete="off" placeholder="https://example.com/your-media">
-              <button data-action="omniget-open" type="button">PROCESS</button>
+              <button data-action="omniget-open" type="button">OPEN IN OMNIGET</button>
             </div>
 
             <label class="omniget-consent">
@@ -113,8 +113,8 @@
             </label>
 
             <div class="omniget-actions">
-              <button data-action="omniget-audio" class="omniget-secondary omniget-mode active" type="button">AUDIO</button>
-              <button data-action="omniget-video" class="omniget-secondary omniget-mode" type="button">VIDEO</button><a class="omniget-secondary" href="https://github.com/tonhowtf/omniget" target="_blank" rel="noopener noreferrer">SOURCE ↗</a>
+              <a data-role="omniget-release-link" class="omniget-secondary" href="https://github.com/tonhowtf/omniget/releases/latest" target="_blank" rel="noopener noreferrer">INSTALL OMNIGET</a>
+              <a class="omniget-secondary" href="https://github.com/tonhowtf/omniget" target="_blank" rel="noopener noreferrer">SOURCE ↗</a>
             </div>
           </div>
 
@@ -240,12 +240,12 @@
             <span class="omniget-kicker">OMNIGET</span>
             <strong data-role="omniget-version">—</strong>
           </div>
-          <h2>OmniGet Web Engine</h2>
-          <p>Process a permitted link directly in DRAGON.</p>
+          <h2>Local OmniGet</h2>
+          <p>Open a media link in the OmniGet app installed on this device.</p>
 
           <div class="mobile-omniget-input">
             <input data-role="omniget-url" type="url" inputmode="url" autocomplete="off" placeholder="Paste media URL">
-            <button data-action="omniget-open" type="button">PROCESS</button>
+            <button data-action="omniget-open" type="button">OPEN</button>
           </div>
 
           <label class="omniget-consent mobile">
@@ -254,8 +254,8 @@
           </label>
 
           <div class="mobile-omniget-links">
-            <button data-action="omniget-audio" class="omniget-mobile-mode active" type="button">AUDIO</button>
-            <button data-action="omniget-video" class="omniget-mobile-mode" type="button">VIDEO</button><a href="https://github.com/tonhowtf/omniget" target="_blank" rel="noopener noreferrer">GITHUB ↗</a>
+            <a data-role="omniget-release-link" href="https://github.com/tonhowtf/omniget/releases/latest" target="_blank" rel="noopener noreferrer">INSTALL</a>
+            <a href="https://github.com/tonhowtf/omniget" target="_blank" rel="noopener noreferrer">GITHUB ↗</a>
           </div>
 
           <small data-role="omniget-status" class="omniget-status">Checking OmniGet…</small>
