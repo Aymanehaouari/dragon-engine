@@ -1177,3 +1177,48 @@ body{
     animation:none!important;
   }
 }
+
+
+/* ===== MOBILE APP VIEWPORT LOCK ===== */
+html,
+body{
+  width:100%;
+  max-width:100%;
+  overflow-x:hidden;
+  overscroll-behavior-x:none;
+}
+
+@media (max-width:760px){
+  html,
+  body{
+    position:relative;
+    width:100%;
+    max-width:100vw;
+    overflow-x:hidden;
+    overscroll-behavior-x:none;
+    touch-action:pan-y;
+    -webkit-text-size-adjust:100%;
+  }
+
+  .mobile-app,
+  .mobile-main,
+  .mobile-header,
+  .mobile-results-section,
+  .mobile-results{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+  }
+
+  .mobile-chips{
+    max-width:100%;
+    overscroll-behavior-x:contain;
+    touch-action:pan-x;
+  }
+
+  input,
+  button,
+  a{
+    touch-action:manipulation;
+  }
+}
