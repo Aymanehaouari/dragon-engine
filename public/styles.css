@@ -1222,3 +1222,43 @@ body{
     touch-action:manipulation;
   }
 }
+
+
+/* ===== IOS ZOOM HARDENING ===== */
+@media (max-width:760px){
+  /* iOS Safari auto-zooms focused form fields smaller than 16px. */
+  input[type="text"],
+  input[type="search"],
+  input:not([type]){
+    font-size:16px !important;
+    line-height:1.2;
+  }
+
+  .mobile-search input{
+    font-size:16px !important;
+  }
+
+  html,
+  body,
+  .mobile-app{
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+
+  body{
+    touch-action:pan-y;
+  }
+
+  .mobile-search,
+  .mobile-main,
+  .mobile-results,
+  .mobile-track,
+  .mobile-mini-player,
+  .mobile-player-sheet{
+    touch-action:pan-y;
+  }
+
+  .mobile-chips{
+    touch-action:pan-x;
+  }
+}
