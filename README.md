@@ -1,100 +1,72 @@
-# DRAGON — Cloudflare Free + Render Free (OmniGet-style backend)
+# DRAGON — YouTube discovery + Cloudflare R2 downloads
 
-This version replaces the previous .NET/YoutubeDownloader backend with a much smaller backend inspired by OmniGet's architecture:
+DRAGON now separates listening from downloading:
 
-- Cloudflare Worker (Free): search, UI, official YouTube playback, authorization gate
-- Render Web Service (Free): Python + FastAPI + yt-dlp + FFmpeg
-- No Cloudflare Containers
-- No Railway
+- YouTube Data API: search/discovery
+- Official YouTube embed: listening
+- Cloudflare R2: files you own or are permitted to distribute
+- Cloudflare Worker: maps YouTube video IDs to R2 objects and serves downloads
+- Durable Object MediaRegistry: stores the mapping
 
-The browser sends only a YouTube `videoId` to Cloudflare. Cloudflare reconstructs the full YouTube URL internally and sends it to Render. The Render backend uses yt-dlp + FFmpeg.
+Render and yt-dlp are no longer part of the download path.
 
-## Repository layout
+## Required Cloudflare setup
 
-```text
-index.js
-wrangler.jsonc
-package.json
-public/
-  index.html
-  styles.css
-  app.js
-render-backend/
-  app.py
-  requirements.txt
-  Dockerfile
-  .dockerignore
-```
+Create an R2 bucket named:
 
-## 1) Render setup
+`dragon-media`
 
-Create a new Render Web Service from this same GitHub repository.
+The Worker configuration already binds it as:
 
-Settings:
+`MEDIA`
 
-- Root Directory: `render-backend`
-- Runtime: Docker
-- Instance Type: Free
+Keep these secrets/variables:
 
-Add environment variable:
+- `YOUTUBE_API_KEY`
+- `ADMIN_TOKEN`
 
-- `DRAGON_BRIDGE_TOKEN` = a long random secret
+The old Render variables are no longer used by the Worker:
 
-Deploy.
+- `DOWNLOAD_BACKEND_URL`
+- `DOWNLOAD_BRIDGE_TOKEN`
+- `AUTHORIZED_VIDEO_IDS`
+- `AUTHORIZED_CHANNEL_IDS`
 
-When Render gives you a URL like:
+They can be removed after the new deployment is working.
 
-`https://dragon-downloader.onrender.com`
+## Deploy
 
-open:
-
-`https://dragon-downloader.onrender.com/health`
-
-Expected response contains:
-
-`"engine":"yt-dlp + FFmpeg"`
-
-## 2) Cloudflare setup
-
-Use the repository root for the Worker.
+The GitHub repository is connected to Cloudflare.
 
 Deploy command:
 
 `npx wrangler deploy`
 
-Add these Worker variables/secrets:
-
-- `YOUTUBE_API_KEY`
-- `DOWNLOAD_BACKEND_URL` = your Render URL
-- `DOWNLOAD_BRIDGE_TOKEN` = exactly the same value as Render's `DRAGON_BRIDGE_TOKEN`
-- `AUTHORIZED_VIDEO_IDS` = comma-separated YouTube video IDs you own/control for the test
-- `AUTHORIZED_CHANNEL_IDS` = optional comma-separated channel IDs you own/control
-
-If your existing Worker has a different service name, change `"name"` in `wrangler.jsonc` to match it.
-
-Then redeploy.
-
-## 3) Test
+## Admin
 
 Open:
 
-`https://YOUR-WORKER.workers.dev/api/health`
+`/admin.html`
 
-Expected:
+Enter `ADMIN_TOKEN`.
 
-`{"worker":true,"downloader":true}`
+For each file:
+1. Enter the matching YouTube video URL or video ID.
+2. Select MP3 or MP4.
+3. Pick your local file.
+4. Upload.
 
-Then open DRAGON and search.
+The file is stored in R2 and mapped to the YouTube video ID.
 
-- LISTEN uses the official YouTube embed.
-- DOWNLOAD appears only for video IDs/channels you explicitly authorized.
-- Browser sends only the video ID.
-- Cloudflare creates the YouTube URL internally.
-- Cloudflare passes that URL to Render.
-- Render runs yt-dlp + FFmpeg and streams the file back.
+## User flow
 
-## Why this backend is smaller
+Search:
+YouTube API → DRAGON
 
-OmniGet itself is a large Tauri/Rust desktop app, but its download workflow is built around yt-dlp + FFmpeg. For DRAGON's web backend, using the same underlying engine directly avoids shipping OmniGet's desktop UI, plugins, local database, browser extension and unrelated components.
+Listen:
+DRAGON → official YouTube embed
 
-This package does not copy OmniGet's application source.
+Download:
+DRAGON → Cloudflare Worker → R2 → browser
+
+The download itself does not call YouTube and does not use Render.
