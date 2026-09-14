@@ -7,6 +7,16 @@
     "directory": "./public",
     "binding": "ASSETS"
   },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DragonDownloader"]
+    },
+    {
+      "tag": "v2",
+      "deleted_classes": ["DragonDownloader"]
+    }
+  ],
   "observability": {
     "enabled": true
   }
