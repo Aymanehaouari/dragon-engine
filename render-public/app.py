@@ -13,6 +13,11 @@ UPSTREAM = os.environ.get(
     "DRAGON_UPSTREAM",
     "https://dragon-music.aymanehaouari25.workers.dev",
 ).rstrip("/")
+OMNIGET_BACKEND = os.environ.get(
+    "OMNIGET_BACKEND_URL",
+    "https://dragon-omniget-engine.onrender.com",
+).rstrip("/")
+OMNIGET_TOKEN = os.environ.get("OMNIGET_WEB_TOKEN", "")
 
 app = FastAPI(title="DRAGON Public Gateway")
 
@@ -25,9 +30,28 @@ async def health():
     return {"ok": True, "upstream": UPSTREAM}
 
 
+def omniget_target(path: str):
+    if not path.startswith("omniget/"):
+        return None
+
+    suffix = path[len("omniget/"):]
+    if suffix == "health":
+        return f"{OMNIGET_BACKEND}/health"
+    if suffix == "info":
+        return f"{OMNIGET_BACKEND}/v1/info"
+    if suffix == "download":
+        return f"{OMNIGET_BACKEND}/v1/download"
+    if suffix.startswith("jobs/"):
+        return f"{OMNIGET_BACKEND}/v1/jobs/{suffix[len('jobs/'):]}"
+    if suffix.startswith("files/"):
+        return f"{OMNIGET_BACKEND}/v1/files/{suffix[len('files/'):]}"
+    return None
+
+
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def proxy_api(path: str, request: Request):
-    target = f"{UPSTREAM}/api/{path}"
+    direct_omniget = omniget_target(path)
+    target = direct_omniget or f"{UPSTREAM}/api/{path}"
     params = list(request.query_params.multi_items())
     body = await request.body()
 
@@ -36,7 +60,16 @@ async def proxy_api(path: str, request: Request):
     if content_type:
         forward_headers["content-type"] = content_type
 
-    client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=20.0))
+    if direct_omniget and path != "omniget/health":
+        if not OMNIGET_TOKEN:
+            return Response(
+                '{"error":"OmniGet gateway token is not configured."}',
+                status_code=503,
+                media_type="application/json",
+            )
+        forward_headers["authorization"] = f"Bearer {OMNIGET_TOKEN}"
+
+    client = httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=30.0))
     upstream = await client.send(
         client.build_request(
             request.method,
