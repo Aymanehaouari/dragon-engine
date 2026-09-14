@@ -3,121 +3,251 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#070707">
+  <meta name="theme-color" content="#050505">
   <title>DRAGON — Music</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="ambient ambient-a"></div>
-  <div class="ambient ambient-b"></div>
+  <div class="bg-glow glow-one"></div>
+  <div class="bg-glow glow-two"></div>
 
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="DRAGON home">
-      <span class="brand-mark">D</span>
-      <span>DRAGON</span>
-    </a>
+  <!-- LAPTOP / DESKTOP EXPERIENCE -->
+  <div class="desktop-app">
+    <aside class="desktop-sidebar">
+      <a class="dragon-brand" href="/" aria-label="DRAGON home">
+        <span class="dragon-mark">D</span>
+        <span class="dragon-word">DRAGON</span>
+      </a>
 
-    <div class="search-wrap">
-      <span class="search-icon">⌕</span>
-      <input id="query" autocomplete="off" placeholder="Search songs, artists, albums...">
-      <kbd>ENTER</kbd>
-    </div>
+      <nav class="desktop-nav">
+        <p class="nav-label">DISCOVER</p>
+        <button class="nav-link active" data-preset="global hits"><span>✦</span> For You</button>
+        <button class="nav-link" data-preset="top songs 2026"><span>↗</span> Trending</button>
+        <button class="nav-link" data-preset="new music 2026"><span>◌</span> New Music</button>
+        <button class="nav-link" data-preset="live music performances"><span>◉</span> Live</button>
+      </nav>
 
-    <div class="top-actions">
-      <button id="themePulse" class="ghost-button" type="button">FOCUS</button>
-      <div class="live-dot"><span></span>LIVE</div>
-    </div>
-  </header>
+      <section class="desktop-recents">
+        <p class="nav-label">RECENT</p>
+        <div data-role="recent-list" class="recent-list"></div>
+      </section>
 
-  <main class="app-shell">
-    <aside class="sidebar">
-      <div class="side-label">DISCOVER</div>
-      <button class="nav-item active" data-preset="global hits">✦ For You</button>
-      <button class="nav-item" data-preset="new music 2026">◌ New Releases</button>
-      <button class="nav-item" data-preset="top songs 2026">↗ Trending</button>
-      <button class="nav-item" data-preset="live music performances">◉ Live</button>
-
-      <div class="side-label recent-label">RECENT SEARCHES</div>
-      <div id="recentSearches" class="recent-searches"></div>
-
-      <div class="side-footer">
-        <div class="mini-logo">DRAGON</div>
-        <p>Minimal interface. Maximum focus.</p>
-      </div>
+      <footer class="sidebar-footer">
+        <span class="status-dot"></span>
+        <span>YOUTUBE CONNECTED</span>
+      </footer>
     </aside>
 
-    <section class="content">
-      <section class="hero-card">
+    <main class="desktop-main">
+      <header class="desktop-header">
         <div>
-          <div class="eyebrow">DRAGON RADIO // YOUTUBE POWERED</div>
-          <h1>Music without the noise.</h1>
-          <p>Search the entire YouTube music catalog in a cleaner, faster interface built around listening.</p>
+          <p class="micro-label">DRAGON / LISTENING SYSTEM</p>
+          <h1>Sound first.</h1>
         </div>
-        <button id="heroSearch" class="primary-button" type="button">EXPLORE NOW</button>
+
+        <div class="desktop-search">
+          <span>⌕</span>
+          <input data-role="search-input" autocomplete="off" placeholder="Search any song, artist, album or mix">
+          <kbd>ENTER</kbd>
+        </div>
+      </header>
+
+      <section class="desktop-feature">
+        <div class="feature-copy">
+          <p class="micro-label">NO FEED NOISE. JUST MUSIC.</p>
+          <h2>Your music,<br>without distraction.</h2>
+          <p>Search the full YouTube music catalog and listen inside a purpose-built interface.</p>
+          <button class="feature-button" data-action="focus-search">START LISTENING</button>
+        </div>
+        <div class="feature-art" aria-hidden="true">
+          <div class="disc disc-back"></div>
+          <div class="disc disc-front"><span>D</span></div>
+        </div>
       </section>
 
-      <section class="section-block">
-        <div class="section-title-row">
+      <section class="desktop-results-section">
+        <div class="section-heading">
           <div>
-            <div class="eyebrow">DISCOVERY</div>
-            <h2 id="resultsTitle">Recommended for you</h2>
+            <p class="micro-label">DISCOVERY</p>
+            <h3 data-role="results-title">Recommended for you</h3>
           </div>
-          <div class="result-meta"><span id="count">0</span> tracks</div>
+          <div class="track-count"><span data-role="count">0</span> TRACKS</div>
         </div>
 
-        <div id="results" class="tracks-grid">
-          <div class="empty-state">
-            <div class="empty-symbol">D</div>
-            <h3>Start with a search</h3>
-            <p>Find any artist, song, remix, live performance or album.</p>
+        <div data-role="results" class="desktop-results">
+          <div class="desktop-empty">
+            <div class="empty-mark">D</div>
+            <h4>Search to begin</h4>
+            <p>DRAGON keeps the interface quiet until you ask for music.</p>
           </div>
         </div>
 
-        <div class="load-more-wrap">
-          <button id="loadMore" class="ghost-button" hidden>LOAD MORE</button>
+        <div class="load-zone">
+          <button class="load-more" data-action="load-more" hidden>LOAD MORE</button>
         </div>
       </section>
-    </section>
-  </main>
+    </main>
 
-  <section id="playerPanel" class="player-panel hidden">
-    <div class="player-media">
-      <img id="playerThumb" alt="">
-      <div class="player-copy">
-        <div id="playerTitle" class="player-title">Nothing playing</div>
-        <div id="playerChannel" class="player-channel">DRAGON</div>
+    <aside class="desktop-player-rail">
+      <div class="rail-head">
+        <p class="micro-label">NOW PLAYING</p>
+        <button class="rail-queue" data-action="open-queue">QUEUE</button>
+      </div>
+
+      <div class="rail-player idle" data-role="desktop-player">
+        <div class="rail-cover-wrap">
+          <img data-role="player-thumb" alt="">
+          <div class="rail-cover-placeholder">D</div>
+        </div>
+
+        <div class="rail-track-copy">
+          <h3 data-role="player-title">Nothing playing</h3>
+          <p data-role="player-channel">Choose a track</p>
+        </div>
+
+        <div class="rail-controls">
+          <button data-action="prev" aria-label="Previous">⏮</button>
+          <button class="main-play" data-action="play-pause" aria-label="Play or pause">▶</button>
+          <button data-action="next" aria-label="Next">⏭</button>
+        </div>
+
+        <div class="rail-progress">
+          <input data-role="progress" type="range" min="0" max="1000" value="0">
+          <div>
+            <span data-role="current-time">0:00</span>
+            <span data-role="duration">0:00</span>
+          </div>
+        </div>
+
+        <button class="youtube-link" data-action="open-youtube" disabled>OPEN ON YOUTUBE ↗</button>
+      </div>
+
+      <div class="rail-note">
+        <span>DRAGON</span>
+        <p>A dedicated player for long listening sessions.</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- PHONE EXPERIENCE -->
+  <div class="mobile-app">
+    <header class="mobile-header">
+      <a class="mobile-brand" href="/">
+        <span class="dragon-mark small">D</span>
+        <span>DRAGON</span>
+      </a>
+      <button class="mobile-avatar" data-action="open-queue" aria-label="Open queue">Q</button>
+    </header>
+
+    <main class="mobile-main">
+      <section class="mobile-welcome">
+        <p>YOUR MUSIC SPACE</p>
+        <h1>What do you want<br>to hear?</h1>
+      </section>
+
+      <div class="mobile-search">
+        <span>⌕</span>
+        <input data-role="search-input" autocomplete="off" placeholder="Songs, artists, albums...">
+      </div>
+
+      <div class="mobile-chips">
+        <button class="mobile-chip active" data-preset="global hits">For You</button>
+        <button class="mobile-chip" data-preset="top songs 2026">Trending</button>
+        <button class="mobile-chip" data-preset="new music 2026">New</button>
+        <button class="mobile-chip" data-preset="live music performances">Live</button>
+        <button class="mobile-chip" data-preset="chill music mix">Chill</button>
+      </div>
+
+      <section class="mobile-results-section">
+        <div class="mobile-section-head">
+          <div>
+            <span class="mobile-kicker">DISCOVER</span>
+            <h2 data-role="results-title">Made for listening</h2>
+          </div>
+          <span class="mobile-count"><span data-role="count">0</span></span>
+        </div>
+
+        <div data-role="results" class="mobile-results">
+          <div class="mobile-empty">
+            <div class="mobile-empty-mark">D</div>
+            <strong>Search for anything</strong>
+            <span>Your results will appear here.</span>
+          </div>
+        </div>
+
+        <button class="mobile-load" data-action="load-more" hidden>Load more</button>
+      </section>
+    </main>
+
+    <div class="mobile-mini-player hidden" data-role="mobile-mini-player">
+      <button class="mini-open" data-action="open-mobile-player" aria-label="Open player">
+        <img data-role="player-thumb" alt="">
+        <span class="mini-copy">
+          <strong data-role="player-title">Nothing playing</strong>
+          <small data-role="player-channel">DRAGON</small>
+        </span>
+      </button>
+      <button class="mini-control" data-action="play-pause" aria-label="Play or pause">▶</button>
+      <button class="mini-control" data-action="next" aria-label="Next">⏭</button>
+    </div>
+
+    <nav class="mobile-tabs">
+      <button class="tab active" data-action="home-tab"><span>⌂</span>Home</button>
+      <button class="tab" data-action="search-tab"><span>⌕</span>Search</button>
+      <button class="tab" data-action="open-queue"><span>≡</span>Queue</button>
+    </nav>
+  </div>
+
+  <!-- PHONE FULL PLAYER -->
+  <section class="mobile-player-sheet" data-role="mobile-player-sheet">
+    <div class="mobile-sheet-head">
+      <button data-action="close-mobile-player">⌄</button>
+      <div>
+        <span>NOW PLAYING</span>
+        <strong>DRAGON</strong>
+      </div>
+      <button data-action="open-youtube">↗</button>
+    </div>
+
+    <div class="mobile-player-art">
+      <img data-role="player-thumb" alt="">
+      <div class="mobile-art-placeholder">D</div>
+    </div>
+
+    <div class="mobile-player-copy">
+      <h2 data-role="player-title">Nothing playing</h2>
+      <p data-role="player-channel">DRAGON</p>
+    </div>
+
+    <div class="mobile-full-progress">
+      <input data-role="progress" type="range" min="0" max="1000" value="0">
+      <div>
+        <span data-role="current-time">0:00</span>
+        <span data-role="duration">0:00</span>
       </div>
     </div>
 
-    <div class="player-center">
-      <div class="player-controls">
-        <button id="prevBtn" type="button" aria-label="Previous">⏮</button>
-        <button id="playPauseBtn" class="play-main" type="button" aria-label="Play/Pause">▶</button>
-        <button id="nextBtn" type="button" aria-label="Next">⏭</button>
-      </div>
-      <div class="progress-row">
-        <span id="currentTime">0:00</span>
-        <input id="progress" type="range" min="0" max="1000" value="0">
-        <span id="duration">0:00</span>
-      </div>
+    <div class="mobile-full-controls">
+      <button data-action="prev">⏮</button>
+      <button class="mobile-main-play" data-action="play-pause">▶</button>
+      <button data-action="next">⏭</button>
     </div>
 
-    <div class="player-right">
-      <button id="openYouTube" class="player-link" type="button">YOUTUBE ↗</button>
-      <button id="queueToggle" class="player-link" type="button">QUEUE</button>
-    </div>
+    <button class="mobile-queue-button" data-action="open-queue">VIEW QUEUE</button>
   </section>
 
-  <aside id="queuePanel" class="queue-panel">
-    <div class="queue-head">
+  <!-- SHARED QUEUE -->
+  <aside class="queue-sheet" data-role="queue-sheet">
+    <div class="queue-sheet-head">
       <div>
-        <div class="eyebrow">UP NEXT</div>
-        <h3>Queue</h3>
+        <span>UP NEXT</span>
+        <h2>Queue</h2>
       </div>
-      <button id="queueClose" class="icon-button" type="button">×</button>
+      <button data-action="close-queue">×</button>
     </div>
-    <div id="queueList" class="queue-list"></div>
+    <div data-role="queue-list" class="queue-list"></div>
   </aside>
+  <div class="sheet-backdrop" data-role="sheet-backdrop"></div>
 
   <div id="youtubeMount" class="youtube-mount" aria-hidden="true"></div>
   <div id="toast" class="toast"></div>
