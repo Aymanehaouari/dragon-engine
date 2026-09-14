@@ -1,20 +1,22 @@
 (() => {
   "use strict";
+
   const $ = (id) => document.getElementById(id);
   const token = $("token");
-  const channel = $("channel");
+  const video = $("video");
+  const format = $("format");
+  const file = $("file");
   const connectBtn = $("connectBtn");
-  const addBtn = $("addBtn");
+  const uploadBtn = $("uploadBtn");
   const msg = $("msg");
   const list = $("list");
 
   token.value = sessionStorage.getItem("dragon_admin_token") || "";
 
-  function headers() {
-    return {
-      "authorization": "Bearer " + token.value.trim(),
-      "content-type": "application/json"
-    };
+  function authHeaders(extra) {
+    return Object.assign({
+      "authorization": "Bearer " + token.value.trim()
+    }, extra || {});
   }
 
   function esc(value) {
@@ -26,124 +28,174 @@
       .replaceAll("'","&#039;");
   }
 
+  function bytes(value) {
+    const n = Number(value || 0);
+    if (!n) return "size unknown";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1024 / 1024).toFixed(1) + " MB";
+  }
+
   function setMessage(text) {
     msg.textContent = text;
   }
 
   async function load() {
-    const t = token.value.trim();
-    if (!t) {
+    if (!token.value.trim()) {
       setMessage("Enter your admin token.");
       return;
     }
-    sessionStorage.setItem("dragon_admin_token", t);
-    setMessage("Loading channels...");
-    const response = await fetch("/api/admin/channels", { headers: headers() });
+
+    sessionStorage.setItem("dragon_admin_token", token.value.trim());
+    setMessage("Loading media library...");
+
+    const response = await fetch("/api/admin/media", {
+      headers: authHeaders()
+    });
+
     let data = {};
     try { data = await response.json(); } catch {}
+
     if (!response.ok) {
       list.innerHTML = '<div class="empty">ACCESS DENIED</div>';
-      setMessage(data.error || "Could not load channels.");
+      setMessage(data.error || "Could not load library.");
       return;
     }
-    render(data.channels || [], data.legacyChannelIds || []);
+
+    render(data.items || []);
     setMessage("Connected.");
   }
 
-  function render(channels, legacy) {
-    if (!channels.length && !legacy.length) {
-      list.innerHTML = '<div class="empty">NO AUTHORIZED CHANNELS YET</div>';
+  function render(items) {
+    if (!items.length) {
+      list.innerHTML = '<div class="empty">NO MEDIA MAPPED YET</div>';
       return;
     }
 
-    const managed = channels.map((c) => {
-      const image = c.thumbnail
-        ? '<img src="' + esc(c.thumbnail) + '" alt="">'
-        : '<div style="width:56px;height:56px;border-radius:50%;background:#151515"></div>';
+    list.innerHTML = items.map((item) => {
+      const buttons = ["mp3","mp4"].map((fmt) => {
+        const record = item.formats && item.formats[fmt];
+        if (!record) return "";
+        return (
+          '<div class="pill">' +
+            fmt.toUpperCase() + " · " + esc(bytes(record.size)) +
+            ' <button class="secondary" style="height:30px;margin-left:8px" data-delete="' +
+            esc(item.videoId) + '" data-format="' + fmt + '">DELETE</button>' +
+          '</div>'
+        );
+      }).join("");
+
       return (
         '<div class="item">' +
-          image +
-          '<div><div class="name">' + esc(c.title || c.id) + '</div>' +
-          '<div class="meta">' + esc(c.handle || "") + (c.handle ? " · " : "") + esc(c.id) + '</div></div>' +
-          '<button class="secondary" data-remove="' + esc(c.id) + '">REMOVE</button>' +
+          '<div><div class="name">' + esc(item.videoId) + '</div>' +
+          '<div class="meta">https://www.youtube.com/watch?v=' + esc(item.videoId) + '</div></div>' +
+          '<div class="formats">' + buttons + '</div>' +
         '</div>'
       );
     }).join("");
-
-    const legacyHtml = legacy.map((id) =>
-      '<div class="item">' +
-        '<div style="width:56px;height:56px;border-radius:50%;background:#151515"></div>' +
-        '<div><div class="name">Cloudflare variable channel</div><div class="meta">' + esc(id) + '</div></div>' +
-        '<button class="secondary" disabled>LEGACY</button>' +
-      '</div>'
-    ).join("");
-
-    list.innerHTML = managed + legacyHtml;
   }
 
-  async function add() {
-    const value = channel.value.trim();
+  async function upload() {
+    const selected = file.files && file.files[0];
+
     if (!token.value.trim()) {
       setMessage("Enter your admin token first.");
       return;
     }
-    if (!value) {
-      setMessage("Enter a YouTube channel.");
+
+    if (!video.value.trim()) {
+      setMessage("Enter a YouTube video URL or ID.");
       return;
     }
 
-    addBtn.disabled = true;
-    setMessage("Resolving YouTube channel...");
+    if (!selected) {
+      setMessage("Choose an MP3 or MP4 file.");
+      return;
+    }
+
+    const wanted = format.value;
+    const extension = "." + wanted;
+
+    if (!selected.name.toLowerCase().endsWith(extension)) {
+      setMessage("The selected file must be " + extension.toUpperCase() + ".");
+      return;
+    }
+
+    uploadBtn.disabled = true;
+    setMessage("Uploading " + selected.name + " to R2...");
 
     try {
-      const response = await fetch("/api/admin/channels", {
+      const target =
+        "/api/admin/media/upload?videoId=" +
+        encodeURIComponent(video.value.trim()) +
+        "&format=" +
+        encodeURIComponent(wanted);
+
+      const response = await fetch(target, {
         method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ channel: value })
+        headers: authHeaders({
+          "content-type": selected.type || (wanted === "mp3" ? "audio/mpeg" : "video/mp4"),
+          "x-file-name": encodeURIComponent(selected.name)
+        }),
+        body: selected
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not add channel.");
-      channel.value = "";
-      setMessage("Channel added.");
+
+      let data = {};
+      try { data = await response.json(); } catch {}
+
+      if (!response.ok) {
+        throw new Error(data.error || "Upload failed.");
+      }
+
+      file.value = "";
+      setMessage("Upload complete.");
       await load();
     } catch (error) {
-      setMessage(error.message || "Could not add channel.");
+      setMessage(error.message || "Upload failed.");
     } finally {
-      addBtn.disabled = false;
+      uploadBtn.disabled = false;
     }
   }
 
-  async function removeChannel(id) {
-    if (!confirm("Remove this authorized channel?")) return;
-    setMessage("Removing channel...");
-    const response = await fetch("/api/admin/channels/" + encodeURIComponent(id), {
-      method: "DELETE",
-      headers: headers()
-    });
-    let data = {};
-    try { data = await response.json(); } catch {}
-    if (!response.ok) {
-      setMessage(data.error || "Could not remove channel.");
+  async function remove(videoId, fmt) {
+    if (!confirm("Delete the " + fmt.toUpperCase() + " file from DRAGON storage?")) {
       return;
     }
-    setMessage("Channel removed.");
+
+    setMessage("Deleting " + fmt.toUpperCase() + "...");
+
+    const response = await fetch(
+      "/api/admin/media/" +
+      encodeURIComponent(videoId) +
+      "/" +
+      encodeURIComponent(fmt),
+      {
+        method: "DELETE",
+        headers: authHeaders()
+      }
+    );
+
+    let data = {};
+    try { data = await response.json(); } catch {}
+
+    if (!response.ok) {
+      setMessage(data.error || "Delete failed.");
+      return;
+    }
+
+    setMessage("Deleted.");
     await load();
   }
 
   connectBtn.addEventListener("click", load);
-  addBtn.addEventListener("click", add);
+  uploadBtn.addEventListener("click", upload);
 
   token.addEventListener("keydown", (e) => {
     if (e.key === "Enter") load();
   });
 
-  channel.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") add();
-  });
-
   list.addEventListener("click", (e) => {
-    const button = e.target.closest("[data-remove]");
-    if (button) removeChannel(button.dataset.remove);
+    const button = e.target.closest("[data-delete]");
+    if (button) remove(button.dataset.delete, button.dataset.format);
   });
 
   if (token.value.trim()) load();
