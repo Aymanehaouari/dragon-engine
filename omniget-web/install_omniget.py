@@ -10,8 +10,10 @@ import urllib.request
 from pathlib import Path
 
 API = "https://api.github.com/repos/tonhowtf/omniget/releases/latest"
-TARGET = Path(os.environ.get("OMNIGET_BIN", "/usr/local/bin/omniget"))
-LICENSE_TARGET = Path("/opt/omniget/LICENSE")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+TOOLS_DIR = Path(os.environ.get("OMNIGET_TOOLS_DIR", str(PROJECT_ROOT / ".tools")))
+TARGET = Path(os.environ.get("OMNIGET_BIN", str(TOOLS_DIR / "omniget")))
+LICENSE_TARGET = Path(os.environ.get("OMNIGET_LICENSE_PATH", str(TOOLS_DIR / "OMNIGET-LICENSE")))
 
 def request_json(url):
     req = urllib.request.Request(
