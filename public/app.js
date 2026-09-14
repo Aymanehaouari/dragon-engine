@@ -613,3 +613,56 @@
     window.scrollTo({ left: 0, top: window.scrollY });
   });
 })();
+
+
+/* Stronger iPhone/iPad zoom suppression for the app shell. */
+(() => {
+  if (!window.matchMedia("(max-width: 760px)").matches) return;
+
+  const prevent = (event) => event.preventDefault();
+
+  document.addEventListener("gesturestart", prevent, { passive: false });
+  document.addEventListener("gesturechange", prevent, { passive: false });
+  document.addEventListener("gestureend", prevent, { passive: false });
+
+  document.addEventListener(
+    "touchstart",
+    (event) => {
+      if (event.touches && event.touches.length > 1) {
+        event.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+
+  document.addEventListener(
+    "touchmove",
+    (event) => {
+      if (event.touches && event.touches.length > 1) {
+        event.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+
+  document.addEventListener(
+    "dblclick",
+    (event) => {
+      event.preventDefault();
+    },
+    { passive: false }
+  );
+
+  let lastTouchEnd = 0;
+  document.addEventListener(
+    "touchend",
+    (event) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    },
+    { passive: false }
+  );
+})();
