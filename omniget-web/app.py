@@ -143,8 +143,7 @@ def parse_json_lines(text):
 
 
 @app.get("/health")
-async def health(authorization: str | None = Header(default=None)):
-    auth(authorization)
+async def health():
     cleanup()
     return {
         "ok": True,
