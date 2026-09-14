@@ -45,14 +45,14 @@
           <h1>Sound first.</h1>
         </div>
 
-        <div class="desktop-search">
-          <span>⌕</span>
+        <div class="desktop-search" data-tilt-soft>
+          <span class="search-symbol">⌕</span>
           <input data-role="search-input" autocomplete="off" placeholder="Search any song, artist, album or mix">
-          <kbd>ENTER</kbd>
+          <button class="desktop-search-button" data-action="search-button" aria-label="Search">SEARCH</button>
         </div>
       </header>
 
-      <section class="desktop-feature">
+      <section class="desktop-feature" data-tilt-card>
         <div class="feature-copy">
           <p class="micro-label">NO FEED NOISE. JUST MUSIC.</p>
           <h2>Your music,<br>without distraction.</h2>
@@ -60,6 +60,8 @@
           <button class="feature-button" data-action="focus-search">START LISTENING</button>
         </div>
         <div class="feature-art" aria-hidden="true">
+          <div class="feature-orbit orbit-one"></div>
+          <div class="feature-orbit orbit-two"></div>
           <div class="disc disc-back"></div>
           <div class="disc disc-front"><span>D</span></div>
         </div>
@@ -94,7 +96,7 @@
         <button class="rail-queue" data-action="open-queue">QUEUE</button>
       </div>
 
-      <div class="rail-player idle" data-role="desktop-player">
+      <div class="rail-player idle" data-role="desktop-player" data-tilt-card>
         <div class="rail-cover-wrap">
           <img data-role="player-thumb" alt="">
           <div class="rail-cover-placeholder">D</div>
@@ -146,8 +148,12 @@
       </section>
 
       <div class="mobile-search">
-        <span>⌕</span>
+        <span class="search-symbol">⌕</span>
         <input data-role="search-input" autocomplete="off" placeholder="Songs, artists, albums...">
+        <button class="mobile-search-button" data-action="search-button" aria-label="Search">
+          <span>SEARCH</span>
+          <b>↗</b>
+        </button>
       </div>
 
       <div class="mobile-chips">
@@ -249,6 +255,8 @@
   </aside>
   <div class="sheet-backdrop" data-role="sheet-backdrop"></div>
 
+  <div class="aurora-layer aurora-a"></div>
+  <div class="aurora-layer aurora-b"></div>
   <div id="youtubeMount" class="youtube-mount" aria-hidden="true"></div>
   <div id="toast" class="toast"></div>
 
