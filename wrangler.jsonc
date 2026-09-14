@@ -7,6 +7,29 @@
     "directory": "./public",
     "binding": "ASSETS"
   },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DragonDownloader"]
+    },
+    {
+      "tag": "v2",
+      "deleted_classes": ["DragonDownloader"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["ChannelRegistry"]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": ["MediaRegistry"],
+      "deleted_classes": ["ChannelRegistry"]
+    },
+    {
+      "tag": "v5",
+      "deleted_classes": ["MediaRegistry"]
+    }
+  ],
   "observability": {
     "enabled": true
   }
