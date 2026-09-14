@@ -1,72 +1,36 @@
-# DRAGON — YouTube discovery + Cloudflare R2 downloads
+# DRAGON — Listen-only music interface
 
-DRAGON now separates listening from downloading:
+DRAGON is now a lightweight listening interface powered by the official YouTube search API and YouTube IFrame Player.
 
-- YouTube Data API: search/discovery
-- Official YouTube embed: listening
-- Cloudflare R2: files you own or are permitted to distribute
-- Cloudflare Worker: maps YouTube video IDs to R2 objects and serves downloads
-- Durable Object MediaRegistry: stores the mapping
+## Features
 
-Render and yt-dlp are no longer part of the download path.
+- Search YouTube music
+- Clean premium dark interface
+- In-app playback with the YouTube IFrame Player API
+- Queue
+- Previous / next controls
+- Seek bar and timestamps
+- Recent searches saved locally in the browser
+- Load more results
+- Open any track directly on YouTube
+- Responsive desktop and mobile design
 
-## Required Cloudflare setup
+There is no download backend, no Render dependency, no R2 requirement, no admin panel, and no download flow.
 
-Create an R2 bucket named:
+## Cloudflare
 
-`dragon-media`
-
-The Worker configuration already binds it as:
-
-`MEDIA`
-
-Keep these secrets/variables:
+Required Worker variable:
 
 - `YOUTUBE_API_KEY`
-- `ADMIN_TOKEN`
 
-The old Render variables are no longer used by the Worker:
-
-- `DOWNLOAD_BACKEND_URL`
-- `DOWNLOAD_BRIDGE_TOKEN`
-- `AUTHORIZED_VIDEO_IDS`
-- `AUTHORIZED_CHANNEL_IDS`
-
-They can be removed after the new deployment is working.
-
-## Deploy
-
-The GitHub repository is connected to Cloudflare.
-
-Deploy command:
+Deploy with:
 
 `npx wrangler deploy`
 
-## Admin
+Health check:
 
-Open:
+`/api/health`
 
-`/admin.html`
+Expected mode:
 
-Enter `ADMIN_TOKEN`.
-
-For each file:
-1. Enter the matching YouTube video URL or video ID.
-2. Select MP3 or MP4.
-3. Pick your local file.
-4. Upload.
-
-The file is stored in R2 and mapped to the YouTube video ID.
-
-## User flow
-
-Search:
-YouTube API → DRAGON
-
-Listen:
-DRAGON → official YouTube embed
-
-Download:
-DRAGON → Cloudflare Worker → R2 → browser
-
-The download itself does not call YouTube and does not use Render.
+`listen-only`
