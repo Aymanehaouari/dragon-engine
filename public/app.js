@@ -682,3 +682,48 @@
     { passive: false }
   );
 })();
+
+
+/* DRAGON 3D background parallax — desktop only.
+   Mobile keeps autonomous motion so the app stays stable under touch. */
+(() => {
+  const root = document.documentElement;
+  const finePointer = window.matchMedia("(hover:hover) and (pointer:fine)");
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion:reduce)");
+
+  if (!finePointer.matches || reducedMotion.matches) return;
+
+  let targetX = 0;
+  let targetY = 0;
+  let currentX = 0;
+  let currentY = 0;
+  let raf = 0;
+
+  const render = () => {
+    currentX += (targetX - currentX) * 0.075;
+    currentY += (targetY - currentY) * 0.075;
+
+    root.style.setProperty("--bg-parallax-x", (currentX * 18).toFixed(2) + "px");
+    root.style.setProperty("--bg-parallax-y", (currentY * 14).toFixed(2) + "px");
+    root.style.setProperty("--bg-tilt-x", (-currentY * 1.4).toFixed(2) + "deg");
+    root.style.setProperty("--bg-tilt-y", (currentX * 1.8).toFixed(2) + "deg");
+
+    raf = requestAnimationFrame(render);
+  };
+
+  window.addEventListener("pointermove", (event) => {
+    targetX = event.clientX / window.innerWidth - 0.5;
+    targetY = event.clientY / window.innerHeight - 0.5;
+  }, { passive: true });
+
+  window.addEventListener("blur", () => {
+    targetX = 0;
+    targetY = 0;
+  });
+
+  raf = requestAnimationFrame(render);
+
+  window.addEventListener("pagehide", () => {
+    if (raf) cancelAnimationFrame(raf);
+  }, { once: true });
+})();
