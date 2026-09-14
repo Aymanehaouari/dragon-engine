@@ -1773,3 +1773,24 @@ body::before{
     background:rgba(216,183,106,.025);
   }
 }
+
+
+/* Luxury result entrance */
+.luxury-enter{
+  animation:luxuryReveal .48s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes luxuryReveal{
+  from{
+    opacity:0;
+    transform:translate3d(0,12px,0) scale(.985);
+    filter:blur(2px);
+  }
+  to{
+    opacity:1;
+    transform:translate3d(0,0,0) scale(1);
+    filter:blur(0);
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  .luxury-enter{animation:none!important}
+}
