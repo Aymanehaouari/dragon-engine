@@ -19,6 +19,19 @@
   const queueLists = qsa('[data-role="queue-list"]');
   const toast = qs("#toast");
 
+  const tauriInvoke = window.__TAURI__?.core?.invoke || null;
+
+  async function dragonFetchJson(path) {
+    if (tauriInvoke && path.startsWith("/api/")) {
+      return tauriInvoke("dragon_api_get", { path });
+    }
+
+    const response = await fetch(path);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Request failed");
+    return data;
+  }
+
   let tracks = [];
   let queue = [];
   let selectedIndex = -1;
@@ -126,9 +139,7 @@
     }
 
     try {
-      const response = await fetch(url);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Search failed");
+      const data = await dragonFetchJson(url.pathname + url.search);
 
       const incoming = Array.isArray(data.tracks) ? data.tracks : [];
       tracks = append ? [...tracks, ...incoming] : incoming;
@@ -774,12 +785,15 @@
 })();
 
 
-/* OmniGet section — local installed-app handoff. */
+/* OmniGet section — bundled desktop engine, with browser fallback. */
 (() => {
   const urlInputs = [...document.querySelectorAll('[data-role="omniget-url"]')];
   const consentBoxes = [...document.querySelectorAll('[data-role="omniget-consent"]')];
   const openButtons = [...document.querySelectorAll('[data-action="omniget-open"]')];
   const statuses = [...document.querySelectorAll('[data-role="omniget-status"]')];
+  const tauriInvoke = window.__TAURI__?.core?.invoke || null;
+
+  let mode = "audio";
 
   const setStatus = (message, type = "") => {
     statuses.forEach((el) => {
@@ -804,14 +818,62 @@
   urlInputs.forEach((input) => input.addEventListener("input", () => syncUrl(input)));
   consentBoxes.forEach((box) => box.addEventListener("change", () => syncConsent(box)));
 
+  document.querySelectorAll('[data-action="omniget-audio"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      mode = "audio";
+      document.querySelectorAll('[data-action="omniget-audio"]').forEach((b) => b.classList.add("active"));
+      document.querySelectorAll('[data-action="omniget-video"]').forEach((b) => b.classList.remove("active"));
+    });
+  });
+
+  document.querySelectorAll('[data-action="omniget-video"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      mode = "video";
+      document.querySelectorAll('[data-action="omniget-video"]').forEach((b) => b.classList.add("active"));
+      document.querySelectorAll('[data-action="omniget-audio"]').forEach((b) => b.classList.remove("active"));
+    });
+  });
+
+  const currentUrl = () =>
+    (urlInputs.find((input) => input.offsetParent !== null)?.value ||
+      urlInputs[0]?.value ||
+      "").trim();
+
+  const validate = () => {
+    const raw = currentUrl();
+    if (!raw) throw new Error("Paste a media URL first.");
+
+    let parsed;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      throw new Error("Enter a valid http or https URL.");
+    }
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("Only http and https links are supported.");
+    }
+
+    if (!consentBoxes.some((box) => box.checked)) {
+      throw new Error("Confirm that you own the media or have permission to save it.");
+    }
+
+    return raw;
+  };
+
   const loadMeta = async () => {
     try {
-      const response = await fetch("/api/omniget");
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not load OmniGet metadata.");
+      let data;
+      if (tauriInvoke) {
+        data = await tauriInvoke("dragon_api_get", { path: "/api/omniget" });
+      } else {
+        const response = await fetch("/api/omniget");
+        data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load OmniGet metadata.");
+      }
 
       document.querySelectorAll('[data-role="omniget-version"]').forEach((el) => {
-        el.textContent = data.release?.tag || "Latest";
+        el.textContent = data.release?.tag || "Bundled";
       });
       document.querySelectorAll('[data-role="omniget-license"]').forEach((el) => {
         el.textContent = data.license || "GPL-3.0";
@@ -822,58 +884,52 @@
           ? (stars / 1000).toFixed(1).replace(".0", "") + "K"
           : String(stars || "—");
       });
-      document.querySelectorAll('[data-role="omniget-release-link"]').forEach((el) => {
-        if (data.release?.releaseUrl) el.href = data.release.releaseUrl;
-      });
 
-      setStatus("Local handoff ready. OmniGet will process the link on this device.", "ok");
+      setStatus(
+        tauriInvoke
+          ? "Bundled OmniGet engine ready inside DRAGON."
+          : "Install DRAGON Desktop to use the bundled OmniGet engine.",
+        tauriInvoke ? "ok" : ""
+      );
     } catch {
-      setStatus("Local OmniGet handoff is ready. Metadata could not be loaded.", "ok");
+      setStatus(
+        tauriInvoke
+          ? "DRAGON Desktop is ready. OmniGet metadata is unavailable."
+          : "Install DRAGON Desktop to use OmniGet locally.",
+        tauriInvoke ? "ok" : ""
+      );
     }
   };
 
-  const openInOmniGet = () => {
-    const raw =
-      (urlInputs.find((input) => input.offsetParent !== null)?.value ||
-        urlInputs[0]?.value ||
-        "").trim();
-
-    if (!raw) {
-      setStatus("Paste a media URL first.", "error");
-      return;
-    }
-
-    let parsed;
+  const processMedia = async () => {
     try {
-      parsed = new URL(raw);
-    } catch {
-      setStatus("Enter a valid http or https URL.", "error");
-      return;
+      const url = validate();
+
+      if (!tauriInvoke) {
+        setStatus("This feature requires the DRAGON Desktop app.", "error");
+        return;
+      }
+
+      openButtons.forEach((button) => button.disabled = true);
+      setStatus("OmniGet is processing locally inside DRAGON…", "ok");
+
+      const result = await tauriInvoke("omniget_download", { url, mode });
+
+      setStatus(
+        "Saved to " + (result?.outputDirectory || "your Downloads folder") + ".",
+        "ok"
+      );
+    } catch (error) {
+      setStatus(String(error?.message || error || "OmniGet could not process this URL."), "error");
+    } finally {
+      openButtons.forEach((button) => button.disabled = false);
     }
-
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      setStatus("Only http and https links are supported.", "error");
-      return;
-    }
-
-    if (!consentBoxes.some((box) => box.checked)) {
-      setStatus("Confirm that you own the media or have permission to save it.", "error");
-      return;
-    }
-
-    const handoff = "omniget://" + raw;
-    setStatus("Opening the local OmniGet app…", "ok");
-    window.location.href = handoff;
-
-    setTimeout(() => {
-      setStatus("If OmniGet did not open, install it locally and try again.");
-    }, 1800);
   };
 
-  openButtons.forEach((button) => button.addEventListener("click", openInOmniGet));
+  openButtons.forEach((button) => button.addEventListener("click", processMedia));
   urlInputs.forEach((input) => {
     input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") openInOmniGet();
+      if (event.key === "Enter") processMedia();
     });
   });
 
