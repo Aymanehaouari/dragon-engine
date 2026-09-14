@@ -2,7 +2,6 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-
   const query = $("query");
   const searchBtn = $("searchBtn");
   const results = $("results");
@@ -28,6 +27,11 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function hasFormat(track, wanted) {
+    return Array.isArray(track.downloadFormats) &&
+      track.downloadFormats.includes(wanted);
   }
 
   async function search() {
@@ -67,12 +71,16 @@
     }
 
     results.innerHTML = tracks.map((track, index) => {
-      const downloadAction = track.downloadAuthorized
+      const formats = Array.isArray(track.downloadFormats)
+        ? track.downloadFormats.map((x) => x.toUpperCase()).join(" / ")
+        : "";
+
+      const downloadAction = formats
         ? '<button class="download" data-download="' + index + '">DOWNLOAD</button>'
         : "";
 
-      const authFlag = track.downloadAuthorized
-        ? '<span class="flag authorized">AUTHORIZED DOWNLOAD</span>'
+      const flag = formats
+        ? '<span class="flag authorized">R2: ' + esc(formats) + '</span>'
         : '<span class="flag">LISTEN</span>';
 
       return (
@@ -83,7 +91,7 @@
             '<div class="track-channel">' + esc(track.channel) + '</div>' +
             '<div class="track-flags">' +
               '<span class="flag">YOUTUBE</span>' +
-              authFlag +
+              flag +
             '</div>' +
           '</div>' +
           '<div class="track-actions">' +
@@ -97,7 +105,6 @@
 
   function selectTrack(track) {
     selected = track;
-
     nowTitle.textContent = track.title;
     nowChannel.textContent = track.channel;
 
@@ -109,10 +116,12 @@
       "https://www.youtube.com/watch?v=" + encodeURIComponent(track.videoId);
 
     openBtn.disabled = false;
-    openBtn.onclick = () => window.open(youtubeUrl, "_blank", "noopener,noreferrer");
+    openBtn.onclick = () =>
+      window.open(youtubeUrl, "_blank", "noopener,noreferrer");
 
     if (track.embeddable === false) {
-      iframeWrap.innerHTML = '<div class="player-empty">EMBED DISABLED — OPEN IN YOUTUBE</div>';
+      iframeWrap.innerHTML =
+        '<div class="player-empty">EMBED DISABLED — OPEN IN YOUTUBE</div>';
       message.textContent = "THIS VIDEO CANNOT BE EMBEDDED";
     } else {
       const src =
@@ -129,26 +138,36 @@
       message.textContent = "PLAYING";
     }
 
-    downloadBtn.disabled = !track.downloadAuthorized;
-    downloadBtn.textContent = track.downloadAuthorized
-      ? "DOWNLOAD " + format.toUpperCase()
-      : "DOWNLOAD LOCKED";
+    updateDownloadButton();
+  }
 
-    downloadBtn.onclick = () => downloadSelected();
+  function updateDownloadButton() {
+    const available = selected && hasFormat(selected, format);
+
+    downloadBtn.disabled = !available;
+
+    if (!selected) {
+      downloadBtn.textContent = "DOWNLOAD";
+      return;
+    }
+
+    downloadBtn.textContent = available
+      ? "DOWNLOAD " + format.toUpperCase()
+      : format.toUpperCase() + " NOT IN LIBRARY";
+
+    downloadBtn.onclick = available ? downloadSelected : null;
   }
 
   function downloadSelected() {
-    if (!selected || !selected.downloadAuthorized) return;
+    if (!selected || !hasFormat(selected, format)) return;
 
-    // The browser sends only the videoId. The Worker creates the full YouTube URL
-    // internally and passes it to the yt-dlp backend.
     const href =
       "/api/download?videoId=" +
       encodeURIComponent(selected.videoId) +
       "&format=" +
       encodeURIComponent(format);
 
-    message.textContent = "PREPARING " + format.toUpperCase();
+    message.textContent = "DOWNLOADING FROM R2";
 
     const a = document.createElement("a");
     a.href = href;
@@ -159,7 +178,6 @@
   }
 
   searchBtn.addEventListener("click", search);
-
   query.addEventListener("keydown", (event) => {
     if (event.key === "Enter") search();
   });
@@ -177,6 +195,18 @@
       const i = Number(dl.dataset.download);
       if (tracks[i]) {
         selectTrack(tracks[i]);
+
+        if (!hasFormat(tracks[i], format)) {
+          const fallback = tracks[i].downloadFormats?.[0];
+          if (fallback) {
+            format = fallback;
+            document.querySelectorAll(".format").forEach((b) => {
+              b.classList.toggle("active", b.dataset.format === format);
+            });
+          }
+        }
+
+        updateDownloadButton();
         downloadSelected();
       }
     }
@@ -184,45 +214,12 @@
 
   document.querySelectorAll(".format").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll(".format").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".format").forEach((b) =>
+        b.classList.remove("active")
+      );
       button.classList.add("active");
       format = button.dataset.format || "mp3";
-
-      if (selected) {
-        downloadBtn.textContent = selected.downloadAuthorized
-          ? "DOWNLOAD " + format.toUpperCase()
-          : "DOWNLOAD LOCKED";
-      }
+      updateDownloadButton();
     });
   });
-
-  // Subtle desktop-only depth effect.
-  if (
-    !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
-    !window.matchMedia("(pointer: coarse)").matches
-  ) {
-    document.querySelectorAll(".tilt").forEach((el) => {
-      el.addEventListener("mousemove", (event) => {
-        const r = el.getBoundingClientRect();
-        const x = (event.clientX - r.left) / r.width - 0.5;
-        const y = (event.clientY - r.top) / r.height - 0.5;
-        el.style.transform =
-          "perspective(1000px) rotateX(" +
-          (-y * 2.2) +
-          "deg) rotateY(" +
-          (x * 2.2) +
-          "deg)";
-      });
-
-      el.addEventListener("mouseleave", () => {
-        el.style.transform = "";
-      });
-    });
-
-    const light = $("cursorLight");
-    window.addEventListener("mousemove", (event) => {
-      light.style.left = event.clientX + "px";
-      light.style.top = event.clientY + "px";
-    });
-  }
 })();
