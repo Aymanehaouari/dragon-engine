@@ -99,12 +99,12 @@
         <div class="omniget-panel">
           <div class="omniget-copy">
             <span class="omniget-kicker">POWERED ONLY BY OMNIGET</span>
-            <h3>Use your local OmniGet directly from DRAGON.</h3>
-            <p>Paste a media link and DRAGON will hand it to the OmniGet app installed on this computer. Processing stays on your device.</p>
+            <h3>OmniGet is built into DRAGON Desktop.</h3>
+            <p>Paste a media link and DRAGON processes it locally with its bundled OmniGet engine. No separate OmniGet installation is required.</p>
 
             <div class="omniget-input-row">
               <input data-role="omniget-url" type="url" inputmode="url" autocomplete="off" placeholder="https://example.com/your-media">
-              <button data-action="omniget-open" type="button">OPEN IN OMNIGET</button>
+              <button data-action="omniget-open" type="button">DOWNLOAD</button>
             </div>
 
             <label class="omniget-consent">
@@ -113,7 +113,7 @@
             </label>
 
             <div class="omniget-actions">
-              <a data-role="omniget-release-link" class="omniget-secondary" href="https://github.com/tonhowtf/omniget/releases/latest" target="_blank" rel="noopener noreferrer">INSTALL OMNIGET</a>
+              <button data-action="omniget-audio" class="omniget-secondary omniget-mode active" type="button">AUDIO</button><button data-action="omniget-video" class="omniget-secondary omniget-mode" type="button">VIDEO</button>
               <a class="omniget-secondary" href="https://github.com/tonhowtf/omniget" target="_blank" rel="noopener noreferrer">SOURCE ↗</a>
             </div>
           </div>
@@ -240,12 +240,12 @@
             <span class="omniget-kicker">OMNIGET</span>
             <strong data-role="omniget-version">—</strong>
           </div>
-          <h2>Local OmniGet</h2>
-          <p>Open a media link in the OmniGet app installed on this device.</p>
+          <h2>Built-in OmniGet</h2>
+          <p>DRAGON Desktop processes the link locally. No separate OmniGet install.</p>
 
           <div class="mobile-omniget-input">
             <input data-role="omniget-url" type="url" inputmode="url" autocomplete="off" placeholder="Paste media URL">
-            <button data-action="omniget-open" type="button">OPEN</button>
+            <button data-action="omniget-open" type="button">DOWNLOAD</button>
           </div>
 
           <label class="omniget-consent mobile">
@@ -254,7 +254,7 @@
           </label>
 
           <div class="mobile-omniget-links">
-            <a data-role="omniget-release-link" href="https://github.com/tonhowtf/omniget/releases/latest" target="_blank" rel="noopener noreferrer">INSTALL</a>
+            <button data-action="omniget-audio" class="omniget-mobile-mode active" type="button">AUDIO</button><button data-action="omniget-video" class="omniget-mobile-mode" type="button">VIDEO</button>
             <a href="https://github.com/tonhowtf/omniget" target="_blank" rel="noopener noreferrer">GITHUB ↗</a>
           </div>
 
