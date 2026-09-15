@@ -125,8 +125,14 @@ final class OfflineLibrary {
     }
 
     private func loadTracks() -> [OfflineTrack] {
-        guard let data = try? Data(contentsOf: manifestURL),
-              let tracks = try? JSONDecoder().decode([OfflineTrack].self, from: data) else {
+        guard let data = try? Data(contentsOf: manifestURL) else {
+            return []
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        guard let tracks = try? decoder.decode([OfflineTrack].self, from: data) else {
             return []
         }
 
