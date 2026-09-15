@@ -1,0 +1,21 @@
+name: DRAGON
+options:
+  bundleIdPrefix: com.dragon
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+targets:
+  DRAGON:
+    type: application
+    platform: iOS
+    sources:
+      - DRAGON
+    info:
+      path: DRAGON/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dragon.music.ios
+        PRODUCT_NAME: DRAGON
+        SWIFT_VERSION: "5.0"
+    entitlements:
+      path: DRAGON/DRAGON.entitlements
