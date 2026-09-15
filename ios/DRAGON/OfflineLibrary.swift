@@ -7,6 +7,7 @@ struct OfflineTrack: Codable, Identifiable {
     let fileName: String
     let artwork: String
     let createdAt: Date
+    let kind: String?
 }
 
 final class OfflineLibrary {
@@ -38,6 +39,10 @@ final class OfflineLibrary {
         }
     }
 
+    func track(for id: String) -> OfflineTrack? {
+        queue.sync { loadTracks().first(where: { $0.id == id }) }
+    }
+
     func delete(id: String) throws {
         try queue.sync {
             var tracks = loadTracks()
@@ -52,13 +57,14 @@ final class OfflineLibrary {
 
     func download(
         url: URL,
+        expectedKind: String,
         title: String,
         artist: String,
         artwork: String,
         completion: @escaping (Result<OfflineTrack, Error>) -> Void
     ) {
         var request = URLRequest(url: url)
-        request.timeoutInterval = 60
+        request.timeoutInterval = 120
 
         URLSession.shared.downloadTask(with: request) { [weak self] tempURL, response, error in
             guard let self else { return }
@@ -71,23 +77,22 @@ final class OfflineLibrary {
             guard let http = response as? HTTPURLResponse,
                   (200...299).contains(http.statusCode),
                   let tempURL else {
-                completion(.failure(NSError(
-                    domain: "DRAGON",
-                    code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "The audio server did not return a downloadable file."]
-                )))
+                completion(.failure(self.error("The media server did not return a downloadable file.")))
                 return
             }
 
             let mime = (http.mimeType ?? "").lowercased()
             let ext = self.fileExtension(for: url, mimeType: mime)
+            let detectedKind = self.mediaKind(extension: ext, mimeType: mime)
 
-            guard mime.hasPrefix("audio/") || self.isKnownAudioExtension(ext) else {
-                completion(.failure(NSError(
-                    domain: "DRAGON",
-                    code: 2,
-                    userInfo: [NSLocalizedDescriptionKey: "This link is not a direct audio file."]
-                )))
+            guard let detectedKind else {
+                completion(.failure(self.error("This link is not a supported direct audio or video file.")))
+                return
+            }
+
+            let wanted = expectedKind.lowercased()
+            if ["audio", "video"].contains(wanted), wanted != detectedKind {
+                completion(.failure(self.error("The selected mode does not match the media file.")))
                 return
             }
 
@@ -102,13 +107,15 @@ final class OfflineLibrary {
                 }
                 try self.fileManager.moveItem(at: tempURL, to: destination)
 
+                let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
                 let track = OfflineTrack(
                     id: id,
-                    title: title.isEmpty ? (response?.suggestedFilename ?? "Saved track") : title,
+                    title: cleanTitle.isEmpty ? (response?.suggestedFilename ?? url.deletingPathExtension().lastPathComponent) : cleanTitle,
                     artist: artist,
                     fileName: fileName,
                     artwork: artwork,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    kind: detectedKind
                 )
 
                 try self.queue.sync {
@@ -149,9 +156,15 @@ final class OfflineLibrary {
         try data.write(to: manifestURL, options: .atomic)
     }
 
+    private func mediaKind(extension ext: String, mimeType: String) -> String? {
+        if mimeType.hasPrefix("audio/") || isKnownAudioExtension(ext) { return "audio" }
+        if mimeType.hasPrefix("video/") || isKnownVideoExtension(ext) { return "video" }
+        return nil
+    }
+
     private func fileExtension(for url: URL, mimeType: String) -> String {
         let pathExt = url.pathExtension.lowercased()
-        if isKnownAudioExtension(pathExt) { return pathExt }
+        if isKnownAudioExtension(pathExt) || isKnownVideoExtension(pathExt) { return pathExt }
 
         switch mimeType {
         case "audio/mpeg": return "mp3"
@@ -160,11 +173,22 @@ final class OfflineLibrary {
         case "audio/wav", "audio/x-wav": return "wav"
         case "audio/flac": return "flac"
         case "audio/ogg": return "ogg"
-        default: return "m4a"
+        case "video/mp4": return "mp4"
+        case "video/quicktime": return "mov"
+        case "video/x-m4v": return "m4v"
+        default: return "bin"
         }
     }
 
     private func isKnownAudioExtension(_ ext: String) -> Bool {
         ["mp3", "m4a", "aac", "wav", "flac", "ogg"].contains(ext)
+    }
+
+    private func isKnownVideoExtension(_ ext: String) -> Bool {
+        ["mp4", "mov", "m4v"].contains(ext)
+    }
+
+    private func error(_ message: String) -> NSError {
+        NSError(domain: "DRAGON", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 }
