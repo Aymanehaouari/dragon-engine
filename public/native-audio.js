@@ -26,8 +26,8 @@
       return send({ action: "stop" });
     },
 
-    download({ url, title = "Saved track", artist = "", artwork = "" }) {
-      return send({ action: "download", url, title, artist, artwork });
+    download({ url, kind = "audio", title = "", artist = "", artwork = "" }) {
+      return send({ action: "download", url, kind, title, artist, artwork });
     },
 
     library() {
