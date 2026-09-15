@@ -1,31 +1,45 @@
 (() => {
   const bridge = window.webkit?.messageHandlers?.dragonAudio;
 
+  const send = (payload) => {
+    if (!bridge) return false;
+    bridge.postMessage(payload);
+    return true;
+  };
+
   window.DRAGON_NATIVE_AUDIO = {
     available: Boolean(bridge),
 
     play({ url, title = "DRAGON", artist = "", artwork = "" }) {
-      if (!bridge) return false;
-      bridge.postMessage({
-        action: "play",
-        url,
-        title,
-        artist,
-        artwork
-      });
-      return true;
+      return send({ action: "play", url, title, artist, artwork });
     },
 
     pause() {
-      bridge?.postMessage({ action: "pause" });
+      return send({ action: "pause" });
     },
 
     resume() {
-      bridge?.postMessage({ action: "resume" });
+      return send({ action: "resume" });
     },
 
     stop() {
-      bridge?.postMessage({ action: "stop" });
+      return send({ action: "stop" });
+    },
+
+    download({ url, title = "Saved track", artist = "", artwork = "" }) {
+      return send({ action: "download", url, title, artist, artwork });
+    },
+
+    library() {
+      return send({ action: "library" });
+    },
+
+    playOffline(id) {
+      return send({ action: "playOffline", id });
+    },
+
+    deleteOffline(id) {
+      return send({ action: "deleteOffline", id });
     }
   };
 })();
