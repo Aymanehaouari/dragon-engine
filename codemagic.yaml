@@ -1,0 +1,47 @@
+workflows:
+  dragon-ios-free:
+    name: DRAGON iPhone Free Build
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+
+    environment:
+      xcode: latest
+
+    scripts:
+      - name: Install XcodeGen
+        script: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+
+      - name: Generate Xcode project
+        script: |
+          cd ios
+          xcodegen generate
+
+      - name: Build unsigned iPhone app
+        script: |
+          cd ios
+          xcodebuild             -project DRAGON.xcodeproj             -scheme DRAGON             -configuration Release             -destination 'generic/platform=iOS'             -derivedDataPath "$CM_BUILD_DIR/build/DerivedData"             CODE_SIGN_IDENTITY=""             CODE_SIGNING_REQUIRED=NO             CODE_SIGNING_ALLOWED=NO             clean build
+
+      - name: Package unsigned IPA for AltStore
+        script: |
+          set -e
+          APP_PATH="$(find "$CM_BUILD_DIR/build/DerivedData/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "DRAGON .app was not found"
+            exit 1
+          fi
+
+          rm -rf "$CM_BUILD_DIR/build/Payload"
+          mkdir -p "$CM_BUILD_DIR/build/Payload"
+          cp -R "$APP_PATH" "$CM_BUILD_DIR/build/Payload/DRAGON.app"
+
+          cd "$CM_BUILD_DIR/build"
+          /usr/bin/zip -qry DRAGON-Free.ipa Payload
+
+          echo "Created: $CM_BUILD_DIR/build/DRAGON-Free.ipa"
+
+    artifacts:
+      - build/DRAGON-Free.ipa
+      - build/DerivedData/Build/Products/Release-iphoneos/*.app
