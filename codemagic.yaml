@@ -16,13 +16,54 @@ workflows:
 
       - name: Generate Xcode project
         script: |
+          set -e
           cd ios
           xcodegen generate
+          grep -R "LaunchScreen.storyboard" DRAGON.xcodeproj/project.pbxproj
+          grep -R "TARGETED_DEVICE_FAMILY = 1" DRAGON.xcodeproj/project.pbxproj
 
       - name: Build unsigned iPhone app
         script: |
+          set -e
           cd ios
-          xcodebuild             -project DRAGON.xcodeproj             -scheme DRAGON             -configuration Release             -destination 'generic/platform=iOS'             -derivedDataPath "$CM_BUILD_DIR/build/DerivedData"             CODE_SIGN_IDENTITY=""             CODE_SIGNING_REQUIRED=NO             CODE_SIGNING_ALLOWED=NO             clean build
+          xcodebuild \
+            -project DRAGON.xcodeproj \
+            -scheme DRAGON \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$CM_BUILD_DIR/build/DerivedData" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify full-screen iPhone build
+        script: |
+          set -e
+          APP_PATH="$(find "$CM_BUILD_DIR/build/DerivedData/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "DRAGON .app was not found"
+            exit 1
+          fi
+
+          echo "Built app: $APP_PATH"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PATH/Info.plist"
+
+          LAUNCH_NAME=$(/usr/libexec/PlistBuddy -c "Print :UILaunchStoryboardName" "$APP_PATH/Info.plist" 2>/dev/null || true)
+          if [ "$LAUNCH_NAME" != "LaunchScreen" ]; then
+            echo "ERROR: UILaunchStoryboardName is missing from the built app"
+            /usr/bin/plutil -p "$APP_PATH/Info.plist"
+            exit 1
+          fi
+
+          if [ ! -d "$APP_PATH/LaunchScreen.storyboardc" ]; then
+            echo "ERROR: compiled LaunchScreen.storyboardc is missing from the built app"
+            find "$APP_PATH" -maxdepth 2 -print
+            exit 1
+          fi
+
+          echo "Verified: modern iPhone launch screen is present."
 
       - name: Package unsigned IPA for AltStore
         script: |
