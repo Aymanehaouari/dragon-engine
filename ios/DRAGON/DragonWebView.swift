@@ -28,7 +28,13 @@ struct DragonWebView: UIViewRepresentable {
         webView.backgroundColor = .black
         webView.isOpaque = false
 
-        let request = URLRequest(url: startURL)
+        var request = URLRequest(
+            url: startURL,
+            cachePolicy: .reloadIgnoringLocalCacheData,
+            timeoutInterval: 30
+        )
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
         webView.load(request)
         return webView
     }
