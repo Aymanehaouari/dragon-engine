@@ -13,11 +13,35 @@ struct DragonWebView: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
         config.defaultWebpagePreferences.preferredContentMode = .mobile
+        config.defaultWebpagePreferences.allowsContentJavaScript = true
         config.allowsInlineMediaPlayback = true
+
+        let viewportScript = """
+        (() => {
+          let meta = document.querySelector('meta[name="viewport"]');
+          if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'viewport';
+            document.head.appendChild(meta);
+          }
+          meta.content = 'width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';
+          document.documentElement.style.width = '100%';
+          document.documentElement.style.minHeight = '100%';
+          document.documentElement.style.margin = '0';
+          document.documentElement.style.padding = '0';
+        })();
+        """
+        config.userContentController.addUserScript(
+            WKUserScript(
+                source: viewportScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
         config.mediaTypesRequiringUserActionForPlayback = []
         config.userContentController.add(context.coordinator, name: "dragonAudio")
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = WKWebView(frame: UIScreen.main.bounds, configuration: config)
         context.coordinator.webView = webView
         webView.navigationDelegate = context.coordinator
         webView.scrollView.contentInsetAdjustmentBehavior = .never
