@@ -1,21 +1,53 @@
 name: DRAGON
 options:
   bundleIdPrefix: com.dragon
+
 settings:
   base:
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+
 targets:
   DRAGON:
     type: application
     platform: iOS
+    deploymentTarget: "16.0"
+
     sources:
-      - DRAGON
+      - path: DRAGON
+        excludes:
+          - LaunchScreen.storyboard
+      - path: DRAGON/LaunchScreen.storyboard
+        buildPhase: resources
+
     info:
       path: DRAGON/Info.plist
+      properties:
+        CFBundleDisplayName: DRAGON
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleName: DRAGON
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: "0.1.3"
+        CFBundleVersion: "4"
+        UILaunchStoryboardName: LaunchScreen
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIBackgroundModes:
+          - audio
+        UIApplicationSupportsIndirectInputEvents: true
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoadsInWebContent: true
+
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dragon.music.ios
         PRODUCT_NAME: DRAGON
         SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_FILE: DRAGON/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
+        INFOPLIST_KEY_UIRequiresFullScreen: YES
+
     entitlements:
       path: DRAGON/DRAGON.entitlements
