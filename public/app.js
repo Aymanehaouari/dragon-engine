@@ -885,18 +885,24 @@
           : String(stars || "—");
       });
 
+      const nativeReady = Boolean(window.DRAGON_NATIVE_AUDIO?.available);
       setStatus(
-        tauriInvoke
-          ? "Bundled OmniGet engine ready inside DRAGON."
-          : "Install DRAGON Desktop to use the bundled OmniGet engine.",
-        tauriInvoke ? "ok" : ""
+        nativeReady
+          ? "iPhone offline library ready. Direct audio files are saved inside DRAGON."
+          : tauriInvoke
+            ? "Bundled OmniGet engine ready inside DRAGON."
+            : "Open the DRAGON app to save music locally.",
+        nativeReady || tauriInvoke ? "ok" : ""
       );
     } catch {
+      const nativeReady = Boolean(window.DRAGON_NATIVE_AUDIO?.available);
       setStatus(
-        tauriInvoke
-          ? "DRAGON Desktop is ready. OmniGet metadata is unavailable."
-          : "Install DRAGON Desktop to use OmniGet locally.",
-        tauriInvoke ? "ok" : ""
+        nativeReady
+          ? "iPhone offline library ready."
+          : tauriInvoke
+            ? "DRAGON Desktop is ready. OmniGet metadata is unavailable."
+            : "Open the DRAGON app to save music locally.",
+        nativeReady || tauriInvoke ? "ok" : ""
       );
     }
   };
@@ -905,8 +911,27 @@
     try {
       const url = validate();
 
+      if (window.DRAGON_NATIVE_AUDIO?.available) {
+        if (mode !== "audio") {
+          throw new Error("The iPhone offline library currently saves audio files.");
+        }
+
+        openButtons.forEach((button) => button.disabled = true);
+        setStatus("Saving inside DRAGON…", "ok");
+
+        const started = window.DRAGON_NATIVE_AUDIO.download({
+          url,
+          title: "Saved track",
+          artist: "",
+          artwork: ""
+        });
+
+        if (!started) throw new Error("The DRAGON iPhone audio bridge is unavailable.");
+        return;
+      }
+
       if (!tauriInvoke) {
-        setStatus("This feature requires the DRAGON Desktop app.", "error");
+        setStatus("Open DRAGON Desktop or the DRAGON iPhone app to save media locally.", "error");
         return;
       }
 
@@ -934,4 +959,160 @@
   });
 
   loadMeta();
+})();
+
+
+/* DRAGON iPhone offline library UI */
+(() => {
+  const nativeAudio = window.DRAGON_NATIVE_AUDIO;
+  const sheet = document.querySelector('[data-role="library-sheet"]');
+  const list = document.querySelector('[data-role="offline-library-list"]');
+  const status = document.querySelector('[data-role="library-status"]');
+  const backdrop = document.querySelector('[data-role="sheet-backdrop"]');
+  const toast = document.querySelector("#toast");
+
+  let offlineTracks = [];
+
+  const notify = (message) => {
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(notify._timer);
+    notify._timer = setTimeout(() => toast.classList.remove("show"), 2200);
+  };
+
+  const render = () => {
+    if (!list) return;
+
+    if (!nativeAudio?.available) {
+      list.innerHTML = `
+        <div class="offline-empty">
+          <span>D</span>
+          <strong>Open DRAGON on iPhone</strong>
+          <small>The offline library is available inside the native DRAGON app.</small>
+        </div>
+      `;
+      if (status) status.textContent = "Native iPhone library unavailable in this browser.";
+      return;
+    }
+
+    if (status) {
+      status.textContent = offlineTracks.length
+        ? offlineTracks.length + (offlineTracks.length === 1 ? " saved track" : " saved tracks")
+        : "Nothing downloaded yet";
+    }
+
+    if (!offlineTracks.length) {
+      list.innerHTML = `
+        <div class="offline-empty">
+          <span>↓</span>
+          <strong>No offline tracks yet</strong>
+          <small>Use Save to DRAGON with a supported direct audio link.</small>
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = offlineTracks.map((track) => `
+      <article class="offline-track">
+        <button class="offline-play" data-offline-play="${String(track.id).replaceAll('"', '&quot;')}">
+          <span class="offline-art">
+            ${track.artwork ? `<img src="${track.artwork.replaceAll('"', '&quot;')}" alt="">` : "<b>D</b>"}
+            <i>▶</i>
+          </span>
+          <span class="offline-copy">
+            <strong>${escapeHtml(track.title || "Saved track")}</strong>
+            <small>${escapeHtml(track.artist || "DRAGON Offline")}</small>
+          </span>
+        </button>
+        <button class="offline-delete" data-offline-delete="${String(track.id).replaceAll('"', '&quot;')}" aria-label="Delete saved track">×</button>
+      </article>
+    `).join("");
+  };
+
+  const escapeHtml = (value) =>
+    String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+
+  const openLibrary = () => {
+    sheet?.classList.add("open");
+    backdrop?.classList.add("show");
+
+    if (nativeAudio?.available) {
+      if (status) status.textContent = "Loading saved tracks…";
+      nativeAudio.library();
+    } else {
+      render();
+    }
+  };
+
+  const closeLibrary = () => {
+    sheet?.classList.remove("open");
+    if (
+      !document.querySelector('[data-role="queue-sheet"]')?.classList.contains("open") &&
+      !document.querySelector('[data-role="mobile-player-sheet"]')?.classList.contains("open")
+    ) {
+      backdrop?.classList.remove("show");
+    }
+  };
+
+  document.querySelectorAll('[data-action="open-library"]').forEach((button) => {
+    button.addEventListener("click", openLibrary);
+  });
+
+  document.querySelectorAll('[data-action="close-library"]').forEach((button) => {
+    button.addEventListener("click", closeLibrary);
+  });
+
+  list?.addEventListener("click", (event) => {
+    const play = event.target.closest("[data-offline-play]");
+    if (play) {
+      nativeAudio?.playOffline(play.dataset.offlinePlay);
+      notify("Playing from DRAGON Offline");
+      return;
+    }
+
+    const remove = event.target.closest("[data-offline-delete]");
+    if (remove) {
+      nativeAudio?.deleteOffline(remove.dataset.offlineDelete);
+    }
+  });
+
+  backdrop?.addEventListener("click", closeLibrary);
+
+  window.addEventListener("dragon:library-changed", (event) => {
+    offlineTracks = Array.isArray(event.detail?.tracks) ? event.detail.tracks : [];
+    render();
+  });
+
+  window.addEventListener("dragon:download-state", () => {
+    if (status) status.textContent = "Saving inside DRAGON…";
+  });
+
+  window.addEventListener("dragon:download-complete", (event) => {
+    notify((event.detail?.title || "Track") + " saved inside DRAGON");
+    document.querySelectorAll('[data-role="omniget-status"]').forEach((el) => {
+      el.textContent = "Saved inside DRAGON. Available offline.";
+      el.classList.add("ok");
+      el.classList.remove("error");
+    });
+    nativeAudio?.library();
+  });
+
+  window.addEventListener("dragon:native-error", (event) => {
+    const message = event.detail?.message || "DRAGON could not save that file.";
+    notify(message);
+    document.querySelectorAll('[data-role="omniget-status"]').forEach((el) => {
+      el.textContent = message;
+      el.classList.add("error");
+      el.classList.remove("ok");
+    });
+  });
+
+  render();
+  if (nativeAudio?.available) nativeAudio.library();
 })();
