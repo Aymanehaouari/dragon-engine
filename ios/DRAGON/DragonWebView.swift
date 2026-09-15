@@ -19,6 +19,12 @@ struct DragonWebView: UIViewRepresentable {
         context.coordinator.webView = webView
         webView.navigationDelegate = context.coordinator
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.contentInset = .zero
+        webView.scrollView.verticalScrollIndicatorInsets = .zero
+        webView.scrollView.horizontalScrollIndicatorInsets = .zero
+        webView.scrollView.alwaysBounceHorizontal = false
+        webView.scrollView.showsHorizontalScrollIndicator = false
+        webView.scrollView.bounces = false
         webView.backgroundColor = .black
         webView.isOpaque = false
 
@@ -85,17 +91,21 @@ struct DragonWebView: UIViewRepresentable {
             case "playOffline":
                 guard let id = body["id"] as? String,
                       let localURL = library.localURL(for: id),
-                      let track = library.allTracks().first(where: { $0.id == id }) else {
-                    emitError("Saved track was not found.")
+                      let track = library.track(for: id) else {
+                    emitError("Saved media was not found.")
                     return
                 }
 
-                audio.play(
-                    url: localURL,
-                    title: track.title,
-                    artist: track.artist,
-                    artworkURL: URL(string: track.artwork)
-                )
+                if (track.kind ?? "audio") == "video" {
+                    OfflineVideoPlayer.present(url: localURL)
+                } else {
+                    audio.play(
+                        url: localURL,
+                        title: track.title,
+                        artist: track.artist,
+                        artworkURL: URL(string: track.artwork)
+                    )
+                }
 
             case "deleteOffline":
                 guard let id = body["id"] as? String else { return }
@@ -119,14 +129,16 @@ struct DragonWebView: UIViewRepresentable {
                 return
             }
 
-            let title = body["title"] as? String ?? "Saved track"
+            let title = body["title"] as? String ?? ""
             let artist = body["artist"] as? String ?? ""
             let artwork = body["artwork"] as? String ?? ""
+            let kind = body["kind"] as? String ?? "audio"
 
-            emit(event: "dragon:download-state", detail: ["state": "downloading"])
+            emit(event: "dragon:download-state", detail: ["state": "downloading", "kind": kind])
 
             library.download(
                 url: url,
+                expectedKind: kind,
                 title: title,
                 artist: artist,
                 artwork: artwork
@@ -136,7 +148,8 @@ struct DragonWebView: UIViewRepresentable {
                     case .success(let track):
                         self?.emit(event: "dragon:download-complete", detail: [
                             "id": track.id,
-                            "title": track.title
+                            "title": track.title,
+                            "kind": track.kind ?? "audio"
                         ])
                         self?.emitLibrary()
 
@@ -154,6 +167,7 @@ struct DragonWebView: UIViewRepresentable {
                     "title": $0.title,
                     "artist": $0.artist,
                     "artwork": $0.artwork,
+                    "kind": $0.kind ?? "audio",
                     "createdAt": ISO8601DateFormatter().string(from: $0.createdAt)
                 ]
             }
