@@ -237,14 +237,14 @@
       <section class="mobile-omniget-section" id="omniget-mobile">
         <div class="mobile-omniget-card">
           <div class="mobile-omniget-head">
-            <span class="omniget-kicker">OMNIGET</span>
-            <strong data-role="omniget-version">—</strong>
+            <span class="omniget-kicker">OFFLINE AUDIO</span>
+            <strong>LOCAL</strong>
           </div>
-          <h2>Built-in OmniGet</h2>
-          <p>DRAGON Desktop processes the link locally. No separate OmniGet install.</p>
+          <h2>Save to DRAGON</h2>
+          <p>Paste a direct audio-file link you have permission to save. On iPhone it stays inside DRAGON for offline and background playback.</p>
 
           <div class="mobile-omniget-input">
-            <input data-role="omniget-url" type="url" inputmode="url" autocomplete="off" placeholder="Paste media URL">
+            <input data-role="omniget-url" type="url" inputmode="url" autocomplete="off" placeholder="https://example.com/track.mp3">
             <button data-action="omniget-open" type="button">DOWNLOAD</button>
           </div>
 
@@ -254,11 +254,11 @@
           </label>
 
           <div class="mobile-omniget-links">
-            <button data-action="omniget-audio" class="omniget-mobile-mode active" type="button">AUDIO</button><button data-action="omniget-video" class="omniget-mobile-mode" type="button">VIDEO</button>
-            <a href="https://github.com/tonhowtf/omniget" target="_blank" rel="noopener noreferrer">GITHUB ↗</a>
+            <button data-action="omniget-audio" class="omniget-mobile-mode active" type="button">AUDIO</button>
+            <button data-action="open-library" class="omniget-mobile-mode" type="button">LIBRARY</button>
           </div>
 
-          <small data-role="omniget-status" class="omniget-status">Checking OmniGet…</small>
+          <small data-role="omniget-status" class="omniget-status">Open this page inside the DRAGON iPhone app to save offline.</small>
         </div>
       </section>
 
@@ -298,6 +298,7 @@
     <nav class="mobile-tabs">
       <button class="tab active" data-action="home-tab"><span>⌂</span>Home</button>
       <button class="tab" data-action="search-tab"><span>⌕</span>Search</button>
+      <button class="tab" data-action="open-library"><span>↓</span>Library</button>
       <button class="tab" data-action="open-queue"><span>≡</span>Queue</button>
     </nav>
   </div>
@@ -339,6 +340,33 @@
 
     <button class="mobile-queue-button" data-action="open-queue">VIEW QUEUE</button>
   </section>
+
+  <!-- PHONE OFFLINE LIBRARY -->
+  <aside class="library-sheet" data-role="library-sheet">
+    <div class="library-sheet-head">
+      <div>
+        <span>OFFLINE</span>
+        <h2>Library</h2>
+      </div>
+      <button data-action="close-library" aria-label="Close library">×</button>
+    </div>
+
+    <div class="library-summary">
+      <div class="library-orb">D</div>
+      <div>
+        <strong>Your music stays in DRAGON</strong>
+        <span data-role="library-status">Checking local library…</span>
+      </div>
+    </div>
+
+    <div data-role="offline-library-list" class="offline-library-list">
+      <div class="offline-empty">
+        <span>↓</span>
+        <strong>No offline tracks yet</strong>
+        <small>Save a supported audio file and it will appear here.</small>
+      </div>
+    </div>
+  </aside>
 
   <!-- SHARED QUEUE -->
   <aside class="queue-sheet" data-role="queue-sheet">
