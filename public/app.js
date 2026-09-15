@@ -888,7 +888,7 @@
       const nativeReady = Boolean(window.DRAGON_NATIVE_AUDIO?.available);
       setStatus(
         nativeReady
-          ? "iPhone offline library ready. Direct audio files are saved inside DRAGON."
+          ? "iPhone offline library ready. Direct audio and video files can be saved inside DRAGON."
           : tauriInvoke
             ? "Bundled OmniGet engine ready inside DRAGON."
             : "Open the DRAGON app to save music locally.",
@@ -912,16 +912,13 @@
       const url = validate();
 
       if (window.DRAGON_NATIVE_AUDIO?.available) {
-        if (mode !== "audio") {
-          throw new Error("The iPhone offline library currently saves audio files.");
-        }
-
         openButtons.forEach((button) => button.disabled = true);
-        setStatus("Saving inside DRAGON…", "ok");
+        setStatus("Saving " + mode + " inside DRAGON…", "ok");
 
         const started = window.DRAGON_NATIVE_AUDIO.download({
           url,
-          title: "Saved track",
+          kind: mode,
+          title: "",
           artist: "",
           artwork: ""
         });
@@ -1007,7 +1004,7 @@
         <div class="offline-empty">
           <span>↓</span>
           <strong>No offline tracks yet</strong>
-          <small>Use Save to DRAGON with a supported direct audio link.</small>
+          <small>Use Save to DRAGON with a supported direct audio or video file link.</small>
         </div>
       `;
       return;
@@ -1017,12 +1014,12 @@
       <article class="offline-track">
         <button class="offline-play" data-offline-play="${String(track.id).replaceAll('"', '&quot;')}">
           <span class="offline-art">
-            ${track.artwork ? `<img src="${track.artwork.replaceAll('"', '&quot;')}" alt="">` : "<b>D</b>"}
+            ${track.artwork ? `<img src="${track.artwork.replaceAll('"', '&quot;')}" alt="">` : `<b>${track.kind === "video" ? "V" : "D"}</b>`}
             <i>▶</i>
           </span>
           <span class="offline-copy">
-            <strong>${escapeHtml(track.title || "Saved track")}</strong>
-            <small>${escapeHtml(track.artist || "DRAGON Offline")}</small>
+            <strong>${escapeHtml(track.title || (track.kind === "video" ? "Saved video" : "Saved audio"))}</strong>
+            <small>${track.kind === "video" ? "VIDEO · DRAGON OFFLINE" : "AUDIO · DRAGON OFFLINE"}</small>
           </span>
         </button>
         <button class="offline-delete" data-offline-delete="${String(track.id).replaceAll('"', '&quot;')}" aria-label="Delete saved track">×</button>
