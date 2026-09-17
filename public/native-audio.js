@@ -30,6 +30,14 @@
       return send({ action: "download", url, kind, title, artist, artwork });
     },
 
+    openConverter({ youtubeUrl, title = "", artist = "", artwork = "" }) {
+      return send({ action: "openConverter", youtubeUrl, title, artist, artwork });
+    },
+
+    importMedia({ title = "", artist = "", artwork = "" } = {}) {
+      return send({ action: "importMedia", title, artist, artwork });
+    },
+
     library() {
       return send({ action: "library" });
     },
