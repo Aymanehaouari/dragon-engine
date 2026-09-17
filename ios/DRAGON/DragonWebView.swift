@@ -1,5 +1,7 @@
 import SwiftUI
 import WebKit
+import UIKit
+import UniformTypeIdentifiers
 
 struct DragonWebView: UIViewRepresentable {
     let startURL: URL
@@ -71,10 +73,13 @@ struct DragonWebView: UIViewRepresentable {
         uiView.configuration.userContentController.removeScriptMessageHandler(forName: "dragonAudio")
     }
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, UIDocumentPickerDelegate {
         let audio: NativeAudioPlayer
         let library = OfflineLibrary()
         weak var webView: WKWebView?
+        private var pendingImportTitle = ""
+        private var pendingImportArtist = ""
+        private var pendingImportArtwork = ""
 
         init(audio: NativeAudioPlayer) {
             self.audio = audio
@@ -117,6 +122,12 @@ struct DragonWebView: UIViewRepresentable {
             case "download":
                 download(body)
 
+            case "openConverter":
+                openConverter(body)
+
+            case "importMedia":
+                presentMediaImporter(body)
+
             case "library":
                 emitLibrary()
 
@@ -153,11 +164,115 @@ struct DragonWebView: UIViewRepresentable {
             }
         }
 
+        private func openConverter(_ body: [String: Any]) {
+            guard let raw = body["youtubeUrl"] as? String,
+                  let youtubeURL = URL(string: raw),
+                  let host = youtubeURL.host?.lowercased(),
+                  host == "youtube.com" || host == "www.youtube.com" || host == "m.youtube.com" || host == "youtu.be" else {
+                emitError("Choose a valid YouTube video first.")
+                return
+            }
+
+            pendingImportTitle = body["title"] as? String ?? ""
+            pendingImportArtist = body["artist"] as? String ?? ""
+            pendingImportArtwork = body["artwork"] as? String ?? ""
+
+            UIPasteboard.general.string = raw
+
+            guard let converterURL = URL(string: "https://ytmp3.nz") else { return }
+            DispatchQueue.main.async { [weak self] in
+                UIApplication.shared.open(converterURL, options: [:]) { opened in
+                    if opened {
+                        self?.emit(
+                            event: "dragon:converter-opened",
+                            detail: ["copied": true]
+                        )
+                    } else {
+                        self?.emitError("Could not open the converter website.")
+                    }
+                }
+            }
+        }
+
+        private func presentMediaImporter(_ body: [String: Any]) {
+            if let title = body["title"] as? String, !title.isEmpty {
+                pendingImportTitle = title
+            }
+            if let artist = body["artist"] as? String, !artist.isEmpty {
+                pendingImportArtist = artist
+            }
+            if let artwork = body["artwork"] as? String, !artwork.isEmpty {
+                pendingImportArtwork = artwork
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self,
+                      let presenter = self.topViewController() else {
+                    self?.emitError("Could not open the Files picker.")
+                    return
+                }
+
+                let picker = UIDocumentPickerViewController(
+                    forOpeningContentTypes: [UTType.audio, UTType.movie],
+                    asCopy: true
+                )
+                picker.delegate = self
+                picker.allowsMultipleSelection = false
+                presenter.present(picker, animated: true)
+            }
+        }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard let url = urls.first else { return }
+
+            do {
+                let track = try library.importFile(
+                    url: url,
+                    title: pendingImportTitle,
+                    artist: pendingImportArtist,
+                    artwork: pendingImportArtwork
+                )
+
+                emit(event: "dragon:download-complete", detail: [
+                    "id": track.id,
+                    "title": track.title,
+                    "kind": track.kind ?? "audio",
+                    "imported": true
+                ])
+                emitLibrary()
+
+                pendingImportTitle = ""
+                pendingImportArtist = ""
+                pendingImportArtwork = ""
+            } catch {
+                emitError(error.localizedDescription)
+            }
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            emit(event: "dragon:import-cancelled", detail: [:])
+        }
+
+        private func topViewController() -> UIViewController? {
+            guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive }),
+                  let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
+                return nil
+            }
+
+            var current = root
+            while let presented = current.presentedViewController {
+                current = presented
+            }
+            return current
+        }
+
         private func download(_ body: [String: Any]) {
             guard let raw = body["url"] as? String,
                   let url = URL(string: raw),
                   ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
-                emitError("Enter a valid direct audio URL.")
+                emitError("Enter a valid direct audio or video URL.")
                 return
             }
 
