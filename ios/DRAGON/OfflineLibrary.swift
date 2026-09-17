@@ -55,6 +55,53 @@ final class OfflineLibrary {
         }
     }
 
+    func importFile(
+        url: URL,
+        title: String,
+        artist: String,
+        artwork: String
+    ) throws -> OfflineTrack {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessed { url.stopAccessingSecurityScopedResource() }
+        }
+
+        let ext = url.pathExtension.lowercased()
+        guard let kind = mediaKind(extension: ext, mimeType: "") else {
+            throw error("Choose an MP3, M4A, AAC, WAV, FLAC, OGG, MP4, MOV, or M4V file.")
+        }
+
+        let id = UUID().uuidString
+        let fileName = id + "." + ext
+        let destination = root.appendingPathComponent(fileName)
+
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+        try fileManager.copyItem(at: url, to: destination)
+
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackTitle = url.deletingPathExtension().lastPathComponent
+        let track = OfflineTrack(
+            id: id,
+            title: cleanTitle.isEmpty ? fallbackTitle : cleanTitle,
+            artist: artist,
+            fileName: fileName,
+            artwork: artwork,
+            createdAt: Date(),
+            kind: kind
+        )
+
+        try queue.sync {
+            var tracks = loadTracks()
+            tracks.insert(track, at: 0)
+            try saveTracks(tracks)
+        }
+
+        return track
+    }
+
     func download(
         url: URL,
         expectedKind: String,
