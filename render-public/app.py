@@ -18,6 +18,7 @@ OMNIGET_BACKEND = os.environ.get(
     "https://dragon-omniget-engine.onrender.com",
 ).rstrip("/")
 OMNIGET_TOKEN = os.environ.get("OMNIGET_WEB_TOKEN", "")
+ASSET_VERSION = "20260917-1"
 
 app = FastAPI(title="DRAGON Public Gateway")
 
@@ -110,7 +111,29 @@ async def static_site(path: str):
 
     if path and requested.is_file():
         media_type, _ = mimetypes.guess_type(str(requested))
-        return FileResponse(requested, media_type=media_type)
+        return FileResponse(
+            requested,
+            media_type=media_type,
+            headers={"Cache-Control": "no-store"},
+        )
 
     index = PUBLIC / "index.html"
-    return FileResponse(index, media_type="text/html")
+    html = index.read_text(encoding="utf-8")
+    html = html.replace(
+        "/native-audio.js?v=20260915-4",
+        f"/native-audio.js?v={ASSET_VERSION}",
+    )
+    html = html.replace(
+        "/app.js?v=20260915-4",
+        f"/app.js?v={ASSET_VERSION}",
+    )
+
+    offline_script = f'<script src="/youtube-offline.js?v={ASSET_VERSION}"></script>'
+    if offline_script not in html:
+        html = html.replace("</body>", f"  {offline_script}\n</body>")
+
+    return Response(
+        html,
+        media_type="text/html",
+        headers={"Cache-Control": "no-store"},
+    )
